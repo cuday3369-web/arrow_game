@@ -169,7 +169,7 @@ class PuzzleBoardView(context: Context) : View(context) {
         super.onDraw(canvas)
         if (puzzle.rows <= 0 || puzzle.cols <= 0) return
 
-        val pad = 10f * density
+        val pad = 3f * density
         cell = min(
             (width - 2f * pad) / puzzle.cols,
             (height - 2f * pad) / puzzle.rows
@@ -183,7 +183,7 @@ class PuzzleBoardView(context: Context) : View(context) {
         rect.set(left, top, left + boardW, top + boardH)
         paint.style = Paint.Style.FILL
         paint.color = boardBackgroundColor
-        canvas.drawRoundRect(rect, 18f * density, 18f * density, paint)
+        canvas.drawRoundRect(rect, 14f * density, 14f * density, paint)
 
         // Draw animated colorful neon glow border around the board
         val timeMs = System.currentTimeMillis()
@@ -193,7 +193,7 @@ class PuzzleBoardView(context: Context) : View(context) {
         paint.strokeWidth = 2.5f * density
         paint.color = glowColor
         paint.setShadowLayer(8f * density, 0f, 0f, glowColor)
-        canvas.drawRoundRect(rect, 18f * density, 18f * density, paint)
+        canvas.drawRoundRect(rect, 14f * density, 14f * density, paint)
         paint.clearShadowLayer()
 
         // Draw Dot Grid View (minute subtle dots at cell centers)
@@ -319,15 +319,15 @@ class PuzzleBoardView(context: Context) : View(context) {
             paint.strokeJoin = Paint.Join.ROUND
 
             // Glow shadow layer (subtle glow)
-            paint.strokeWidth = cell * 0.14f * pulse
+            paint.strokeWidth = cell * 0.08f * pulse
             paint.color = color
             paint.alpha = (arrow.alpha * 25).toInt().coerceIn(0, 255)
-            paint.setShadowLayer(2.5f * density, 0f, 0f, color)
+            paint.setShadowLayer(2f * density, 0f, 0f, color)
             canvas.drawPath(snakingPath, paint)
             paint.clearShadowLayer()
 
             // Main pipe stroke (sleek, thin & refined tail)
-            paint.strokeWidth = cell * 0.11f * pulse
+            paint.strokeWidth = cell * 0.055f * pulse
             paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
             canvas.drawPath(snakingPath, paint)
 
@@ -335,8 +335,8 @@ class PuzzleBoardView(context: Context) : View(context) {
             val headPt = animatedPoints.last()
             val hx = headPt.x
             val hy = headPt.y
-            val headLen = cell * 0.26f * pulse
-            val headWidth = cell * 0.18f * pulse
+            val headLen = cell * 0.18f * pulse
+            val headWidth = cell * 0.12f * pulse
 
             val headPath = Path()
             when (arrow.direction) {

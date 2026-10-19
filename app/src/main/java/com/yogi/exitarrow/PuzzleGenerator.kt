@@ -24,10 +24,12 @@ object PuzzleGenerator {
         }
     }
 
-    fun generate(level: Int): Puzzle {
+    fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
         val safeLevel = max(1, level)
-        // Grid size increases with level: Level 1 = 6x6, Level 2 = 7x7, Level 3 = 8x8, up to 12x12
-        val size = (6 + (safeLevel - 1) / 2).coerceIn(6, 12)
+        val maxCap = maxOf(6, maxGridCap)
+        // Responsive grid size expands smoothly across 12-level cycles up to device maxCap
+        val levelInBlock = ((safeLevel - 1) % 12) + 1
+        val size = (6 + (levelInBlock - 1) * (maxCap - 6) / 11).coerceIn(6, maxCap)
         val random = Random(safeLevel.toLong() * 7919L + 37L)
 
         val rem = if (safeLevel % 5 == 0) 5 else (safeLevel % 5)
@@ -39,7 +41,7 @@ object PuzzleGenerator {
         for (_attempt in 0 until maxAttempts) {
             val generatedArrows = mutableListOf<Arrow>()
             val occupied = Array(size) { BooleanArray(size) }
-            val targetArrowCount = 2 * size + size * rem
+            val targetArrowCount = 3 * size + size * rem + 6
 
             var arrowId = 1
             var failCounter = 0
@@ -132,7 +134,7 @@ object PuzzleGenerator {
                 snakingPath.add(0, Pair(behindR, behindC))
                 tempOccupied[behindR][behindC] = true
 
-                val targetLength = random.nextInt(4) + 3 // Length 3 to 6 cells (L, U, Z, S shapes)
+                val targetLength = random.nextInt(3) + 2 // Length 2 to 4 cells for higher arrow density
                 var currR = behindR
                 var currC = behindC
 

@@ -27,5 +27,6 @@ android {
 }
 
 dependencies {
+    implementation(libs.androidx.constraintlayout)
     testImplementation("junit:junit:4.13.2")
 }

@@ -95,7 +95,7 @@ class MainActivity : Activity() {
         root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(16, 24, 16, 12)
+            setPadding(6, 24, 6, 12)
             setBackgroundColor(Color.argb(215, 9, 14, 29))
         }
 
@@ -114,30 +114,26 @@ class MainActivity : Activity() {
                 insets.systemWindowInsetBottom
             }
 
-            val topPad = maxOf(topInset, GameTheme.dp(this, 28))
-            val bottomPad = maxOf(bottomInset, GameTheme.dp(this, 12))
+            val topPad = maxOf(topInset, GameTheme.dp(this, 24))
+            val bottomPad = maxOf(bottomInset, GameTheme.dp(this, 10))
 
             root.setPadding(
-                GameTheme.dp(this, 16),
+                GameTheme.dp(this, 6),
                 topPad,
-                GameTheme.dp(this, 16),
+                GameTheme.dp(this, 6),
                 bottomPad
             )
             insets
         }
 
-        val scroll = ScrollView(this).apply {
-            isFillViewport = true
-        }
         val content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
         }
 
-        scroll.addView(content, FrameLayout.LayoutParams(-1, -1))
         root.addView(
-            scroll,
-            LinearLayout.LayoutParams(-1, 0, 1f)
+            content,
+            LinearLayout.LayoutParams(-1, -1)
         )
 
         confettiOverlay = ConfettiView(this)
@@ -219,16 +215,15 @@ class MainActivity : Activity() {
             0,
             1f
         )
-        boardParams.topMargin = GameTheme.dp(this, 8)
-        boardParams.bottomMargin = GameTheme.dp(this, 8)
-        board.minimumHeight = GameTheme.dp(this, 260)
+        boardParams.topMargin = GameTheme.dp(this, 4)
+        boardParams.bottomMargin = GameTheme.dp(this, 4)
         content.addView(board, boardParams)
 
         statusLabel = GameTheme.text(
             this, "Find a clear arrow.", 14f, GameTheme.MUTED
         )
         statusLabel.gravity = Gravity.CENTER
-        statusLabel.setPadding(0, 6, 0, 8)
+        statusLabel.setPadding(0, 4, 0, 6)
         content.addView(statusLabel)
 
         // Bottom Rectangular Container holding 3 Boxed Action Buttons
@@ -257,7 +252,7 @@ class MainActivity : Activity() {
         hintButton = boxButton("💡 HINT", GameTheme.GOLD)
         hintButton.setOnClickListener { showHint() }
 
-        val boxParams = LinearLayout.LayoutParams(0, GameTheme.dp(this, 48), 1f)
+        val boxParams = LinearLayout.LayoutParams(0, GameTheme.dp(this, 46), 1f)
 
         bottomContainer.addView(resetButton, boxParams)
         bottomContainer.addView(space(8), LinearLayout.LayoutParams(GameTheme.dp(this, 8), 1))
@@ -266,9 +261,9 @@ class MainActivity : Activity() {
         bottomContainer.addView(hintButton, boxParams)
 
         val bottomContainerParams = LinearLayout.LayoutParams(-1, -2)
-        bottomContainerParams.topMargin = GameTheme.dp(this, 6)
-        bottomContainerParams.bottomMargin = GameTheme.dp(this, 6)
-        root.addView(bottomContainer, bottomContainerParams)
+        bottomContainerParams.topMargin = GameTheme.dp(this, 4)
+        bottomContainerParams.bottomMargin = GameTheme.dp(this, 4)
+        content.addView(bottomContainer, bottomContainerParams)
     }
 
     private fun boxButton(label: String, color: Int): Button =
@@ -318,9 +313,14 @@ class MainActivity : Activity() {
         statusLabel.text = "Preparing level $level..."
         updateUI()
 
+        val boardW = if (board.width > 0) board.width else resources.displayMetrics.widthPixels
+        val boardH = if (board.height > 0) board.height else (resources.displayMetrics.heightPixels * 0.55).toInt()
+        val minCellPx = (28f * resources.displayMetrics.density).toInt().coerceAtLeast(1)
+        val maxResponsiveGridSize = minOf((boardW / minCellPx), (boardH / minCellPx)).coerceIn(6, 24)
+
         executor.execute {
             val remotePuzzle = api.fetchLevel(level)
-            val puzzle = remotePuzzle ?: PuzzleGenerator.generate(level)
+            val puzzle = remotePuzzle ?: PuzzleGenerator.generate(level, maxResponsiveGridSize)
 
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
