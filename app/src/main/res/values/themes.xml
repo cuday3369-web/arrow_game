@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ExitArrow"
+        parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">#087F70</item>
+        <item name="android:statusBarColor">#F4E9C9</item>
+        <item name="android:navigationBarColor">#F4E9C9</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>
