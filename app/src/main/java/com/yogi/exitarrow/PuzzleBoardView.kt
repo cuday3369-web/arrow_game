@@ -49,15 +49,17 @@ class PuzzleBoardView(context: Context) : View(context) {
     private var boardW = 0f
     private var boardH = 0f
 
-    // Pinch-to-zoom & Double-tap zoom state
+    // Pinch-to-zoom state & gesture isolation
     var scaleFactor = 1.0f
     private val minScale = 0.85f
     private val maxScale = 4.0f
     private var pivotFocusX = 0f
     private var pivotFocusY = 0f
+    private var isPinching = false
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
+            isPinching = true
             scaleFactor *= detector.scaleFactor
             scaleFactor = scaleFactor.coerceIn(minScale, maxScale)
             pivotFocusX = detector.focusX
@@ -342,21 +344,25 @@ class PuzzleBoardView(context: Context) : View(context) {
                 }
             }
 
-            // Draw bold, prominent snaking body pipe stroke
+            // 1. High contrast dark border outline (prevents merging/blending with adjacent arrows)
             paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeJoin = Paint.Join.ROUND
+            paint.strokeWidth = cell * 0.16f * pulse
+            paint.color = Color.argb(200, 10, 15, 28)
+            paint.alpha = (arrow.alpha * 200).toInt().coerceIn(0, 255)
+            canvas.drawPath(snakingPath, paint)
 
-            // Glow shadow layer (vibrant glow)
-            paint.strokeWidth = cell * 0.22f * pulse
+            // 2. Soft, reduced glow layer
+            paint.strokeWidth = cell * 0.13f * pulse
             paint.color = color
-            paint.alpha = (arrow.alpha * 35).toInt().coerceIn(0, 255)
-            paint.setShadowLayer(4f * density, 0f, 0f, color)
+            paint.alpha = (arrow.alpha * 15).toInt().coerceIn(0, 255)
+            paint.setShadowLayer(1.5f * density, 0f, 0f, color)
             canvas.drawPath(snakingPath, paint)
             paint.clearShadowLayer()
 
-            // Main pipe stroke (bold & prominent arrow body/tail)
-            paint.strokeWidth = cell * 0.15f * pulse
+            // 3. High contrast main body pipe stroke (bold & distinct)
+            paint.strokeWidth = cell * 0.11f * pulse
             paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
             canvas.drawPath(snakingPath, paint)
 
@@ -364,8 +370,8 @@ class PuzzleBoardView(context: Context) : View(context) {
             val headPt = animatedPoints.last()
             val hx = headPt.x
             val hy = headPt.y
-            val headLen = cell * 0.28f * pulse
-            val headWidth = cell * 0.20f * pulse
+            val headLen = cell * 0.22f * pulse
+            val headWidth = cell * 0.15f * pulse
 
             val headPath = Path()
             when (arrow.direction) {
@@ -395,12 +401,17 @@ class PuzzleBoardView(context: Context) : View(context) {
                 }
             }
 
+            // Arrowhead high contrast dark outline
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2f * density
+            paint.color = Color.argb(220, 10, 15, 28)
+            canvas.drawPath(headPath, paint)
+
+            // Arrowhead solid color fill
             paint.style = Paint.Style.FILL
             paint.color = color
             paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
-            paint.setShadowLayer(8f * density, 0f, 0f, color)
             canvas.drawPath(headPath, paint)
-            paint.clearShadowLayer()
         }
 
         canvas.restore()
@@ -408,35 +419,49 @@ class PuzzleBoardView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(event)
+        if (event.pointerCount > 1) {
+            isPinching = true
+            scaleDetector.onTouchEvent(event)
+            return true
+        }
 
-        if (event.actionMasked != MotionEvent.ACTION_UP) return true
-        if (cell <= 0f) return true
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            isPinching = false
+            return true
+        }
 
-        val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
-        val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
+        if (event.actionMasked == MotionEvent.ACTION_UP) {
+            if (isPinching) {
+                isPinching = false
+                return true
+            }
 
-        val localX = (event.x - pX) / scaleFactor + pX
-        val localY = (event.y - pY) / scaleFactor + pY
+            if (cell <= 0f) return true
 
-        val col = ((localX - left) / cell).toInt()
-        val row = ((localY - top) / cell).toInt()
+            val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
+            val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
 
-        if (row !in 0 until puzzle.rows || col !in 0 until puzzle.cols) {
+            val localX = (event.x - pX) / scaleFactor + pX
+            val localY = (event.y - pY) / scaleFactor + pY
+
+            val col = ((localX - left) / cell).toInt()
+            val row = ((localY - top) / cell).toInt()
+
+            if (row in 0 until puzzle.rows && col in 0 until puzzle.cols) {
+                val arrow = puzzle.arrows.firstOrNull {
+                    it.active && it.occupies(row, col) && !isArrowAnimating(it)
+                }
+
+                if (arrow != null) {
+                    clearHint()
+                    onArrowTapped?.invoke(arrow)
+                }
+            }
+
             performClick()
             return true
         }
 
-        val arrow = puzzle.arrows.firstOrNull {
-            it.active && it.occupies(row, col) && !isArrowAnimating(it)
-        }
-
-        if (arrow != null) {
-            clearHint()
-            onArrowTapped?.invoke(arrow)
-        }
-
-        performClick()
         return true
     }
 

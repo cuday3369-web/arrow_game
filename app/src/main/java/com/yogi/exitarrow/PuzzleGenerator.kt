@@ -1,5 +1,6 @@
 package com.yogi.exitarrow
 
+import com.yogi.exitarrow.game.LevelConfig
 import kotlin.math.max
 import java.util.Random
 
@@ -199,28 +200,22 @@ object PuzzleGenerator {
 
     /** Target arrow count calculation: Level 1 = ~36 (Trial Heart), Level 2 = 48, Level 3 = 62... */
     fun targetArrowCountForLevel(level: Int): Int {
-        val safeLevel = maxOf(1, level)
-        return when (safeLevel) {
-            1 -> 36 // Trial Level 1 Heart Lock target
-            2 -> 48
-            3 -> 62
-            4 -> 76
-            else -> 76 + (safeLevel - 4) * 14
-        }
+        val info = LevelConfig.getLevelInfo(level)
+        return info.arrowCount
     }
 
     /** Calculates required grid size to ensure full capacity for the target arrow count. */
     fun calculateRequiredGridSize(targetArrows: Int): Int {
         val requiredCells = (targetArrows * 1.15f).toInt()
         val calculatedSize = kotlin.math.ceil(kotlin.math.sqrt(requiredCells.toDouble())).toInt()
-        return maxOf(13, calculatedSize) // Minimum 13x13 grid as per trial spec
+        return maxOf(8, calculatedSize)
     }
 
-    fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
+    fun generate(level: Int, maxGridCap: Int = 36): Puzzle {
         val safeLevel = max(1, level)
-        val targetArrowCount = targetArrowCountForLevel(safeLevel)
-        val neededGridSize = calculateRequiredGridSize(targetArrowCount)
-        val size = maxOf(neededGridSize, maxGridCap.coerceAtLeast(13))
+        val info = LevelConfig.getLevelInfo(safeLevel)
+        val targetArrowCount = info.arrowCount
+        val size = info.gridSize
 
         val rows = size
         val cols = size
