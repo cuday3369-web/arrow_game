@@ -12,11 +12,53 @@ object PuzzleGenerator {
         Direction.DOWN
     )
 
-    // 2D Binary Masks: 'X' means playable shape cell, '.' means empty exit space.
+    // 10 Distinct 2D Shape Stencil Masks ('X' = playable shape cell, '.' = empty exit space)
     private val MASK_HEART = arrayOf(
-        "..XXX....XXX..",
-        ".XXXXX..XXXXX.",
+        "..XXXX...XXXX..",
+        ".XXXXXX.XXXXXX.",
+        "XXXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXXX",
+        ".XXXXXXXXXXXXX.",
+        "..XXXXXXXXXXX..",
+        "...XXXXXXXXX...",
+        "....XXXXXXX....",
+        ".....XXXXX.....",
+        "......XXX......",
+        ".......X......."
+    )
+
+    private val MASK_S_CURVE = arrayOf(
+        ".XXXXXXXXXXXX.",
         "XXXXXXXXXXXXXX",
+        "XXX...........",
+        "XXXXXXXXXXXX..",
+        ".XXXXXXXXXXXXX",
+        "...........XXX",
+        "XXXXXXXXXXXXXX",
+        ".XXXXXXXXXXXX."
+    )
+
+    private val MASK_STAR = arrayOf(
+        ".......XX.......",
+        "......XXXX......",
+        ".....XXXXXX.....",
+        "XXXXXXXXXXXXXXXX",
+        ".XXXXXXXXXXXXXX.",
+        "..XXXXXXXXXXXX..",
+        "....XXXXXXXX....",
+        "...XXXXXXXXXX...",
+        "..XXXX....XXXX..",
+        ".XXXX......XXXX.",
+        "XXXX........XXXX"
+    )
+
+    private val MASK_DIAMOND = arrayOf(
+        "......XX......",
+        "....XXXXXX....",
+        "...XXXXXXXX...",
+        "..XXXXXXXXXX..",
+        ".XXXXXXXXXXXX.",
         "XXXXXXXXXXXXXX",
         "XXXXXXXXXXXXXX",
         ".XXXXXXXXXXXX.",
@@ -24,45 +66,6 @@ object PuzzleGenerator {
         "...XXXXXXXX...",
         "....XXXXXX....",
         "......XX......"
-    )
-
-    private val MASK_DOG = arrayOf(
-        "...XX......XX.",
-        "..XXX.....XXXX",
-        "..XXXX...XXXXX",
-        "...XXXXXXXXXX.",
-        "....XXXXXXXX..",
-        "....XXXXXXXX..",
-        "....XXXXXXXX..",
-        "....XXX..XXX..",
-        "...XXX....XXX.",
-        "...XXX....XXX."
-    )
-
-    private val MASK_BIRD = arrayOf(
-        "......XX......",
-        "....XXXX......",
-        "...XXXXXX.....",
-        "XXXXXXXXXXXX..",
-        ".XXXXXXXXXXXXX",
-        "..XXXXXXXXXXX.",
-        "....XXXXXXX...",
-        ".....XXXX.....",
-        "....XX..XX....",
-        "...XX....XX..."
-    )
-
-    private val MASK_STAR = arrayOf(
-        "......XX......",
-        ".....XXXX.....",
-        "XXXX.XXXX.XXXX",
-        ".XXXXXXXXXXXX.",
-        "...XXXXXXXX...",
-        "....XXXXXX....",
-        "...XXXXXXXX...",
-        "..XXXX..XXXX..",
-        ".XXX......XXX.",
-        "XX..........XX"
     )
 
     private val MASK_CIRCLE = arrayOf(
@@ -74,20 +77,65 @@ object PuzzleGenerator {
         "XXXXXXXXXXXXXX",
         ".XXXXXXXXXXXX.",
         ".XXXXXXXXXXXX.",
-        "..XXXXXXXXXX.."
+        "..XXXXXXXXXX..",
+        "....XXXXXX...."
     )
 
-    private val MASK_SQUARE = arrayOf(
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX",
-        "XXXXXXXXXXXXX"
+    private val MASK_SPIRAL = arrayOf(
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        "XXX........XXX",
+        "XXX..XXXXX.XXX",
+        "XXX..XXXXX.XXX",
+        "XXX....XXX.XXX",
+        "XXXXXX.XXX.XXX",
+        "XXXXXX.....XXX",
+        "XXXXXXXXXXXXXX"
+    )
+
+    private val MASK_CROSS = arrayOf(
+        "....XXXXXX....",
+        "....XXXXXX....",
+        "....XXXXXX....",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        "....XXXXXX....",
+        "....XXXXXX....",
+        "....XXXXXX...."
+    )
+
+    private val MASK_TRIANGLE = arrayOf(
+        ".......XX.......",
+        "......XXXX......",
+        ".....XXXXXX.....",
+        "....XXXXXXXX....",
+        "...XXXXXXXXXX...",
+        "..XXXXXXXXXXXX..",
+        ".XXXXXXXXXXXXXX.",
+        "XXXXXXXXXXXXXXXX"
+    )
+
+    private val MASK_ARROWHEAD = arrayOf(
+        "....XX........",
+        "....XXXX......",
+        "....XXXXXX....",
+        "XXXXXXXXXXXX..",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXX..",
+        "....XXXXXX....",
+        "....XXXX......",
+        "....XX........"
+    )
+
+    private val MASK_CORRIDORS = arrayOf(
+        "XXXXXXXXXXXXXX",
+        "XXX..XXX..XXXX",
+        "XXX..XXX..XXXX",
+        "XXXXXXXXXXXXXX",
+        "XXXX..XXX..XXX",
+        "XXXX..XXX..XXX",
+        "XXXXXXXXXXXXXX"
     )
 
     fun difficultyForLevel(level: Int): String {
@@ -103,29 +151,37 @@ object PuzzleGenerator {
         }
     }
 
-    /** Maps the level number to a specific shape theme phrase. */
+    /** Maps the level number to one of 10 shape theme descriptions. */
     fun shapeThemeForLevel(level: Int): String {
         val safeLevel = maxOf(1, level)
-        return when ((safeLevel - 1) % 6) {
-            0 -> "Heart Shaped Arrow Level ♥"
-            1 -> "Dog Shaped Arrow Level 🐕"
-            2 -> "Star Shaped Arrow Level ★"
-            3 -> "Circle Shaped Arrow Level ●"
-            4 -> "Bird Shaped Arrow Level 🐦"
-            else -> "Square Block Level ⬛"
+        return when ((safeLevel - 1) % 10) {
+            0 -> "Heart Shaped Level ♥"
+            1 -> "S-Curve Challenge 🐍"
+            2 -> "Star Shaped Level ★"
+            3 -> "Diamond Challenge ◆"
+            4 -> "Circle Shaped Level ●"
+            5 -> "Spiral Challenge 🌀"
+            6 -> "Cross Shaped Level ✚"
+            7 -> "Triangle Shaped Level ▲"
+            8 -> "Arrowhead Challenge ➢"
+            else -> "Winding Corridors 🔀"
         }
     }
 
-    /** Returns the corresponding 2D grid mask stencil for the level. */
+    /** Returns the corresponding 2D grid stencil mask for the level. */
     private fun getMaskForLevel(level: Int): Array<String> {
         val safeLevel = maxOf(1, level)
-        return when ((safeLevel - 1) % 6) {
+        return when ((safeLevel - 1) % 10) {
             0 -> MASK_HEART
-            1 -> MASK_DOG
+            1 -> MASK_S_CURVE
             2 -> MASK_STAR
-            3 -> MASK_CIRCLE
-            4 -> MASK_BIRD
-            else -> MASK_SQUARE
+            3 -> MASK_DIAMOND
+            4 -> MASK_CIRCLE
+            5 -> MASK_SPIRAL
+            6 -> MASK_CROSS
+            7 -> MASK_TRIANGLE
+            8 -> MASK_ARROWHEAD
+            else -> MASK_CORRIDORS
         }
     }
 
@@ -141,24 +197,30 @@ object PuzzleGenerator {
         return mask[mappedR][mappedC] == 'X'
     }
 
-    /** Strict monotonic arrow count calculation: Level 1 = 10, Level 2 = 22 (+12), Level 3 = 34 (+12)... */
+    /** Target arrow count calculation: Level 1 = ~36 (Trial Heart), Level 2 = 48, Level 3 = 62... */
     fun targetArrowCountForLevel(level: Int): Int {
         val safeLevel = maxOf(1, level)
-        return 10 + (safeLevel - 1) * 12
+        return when (safeLevel) {
+            1 -> 36 // Trial Level 1 Heart Lock target
+            2 -> 48
+            3 -> 62
+            4 -> 76
+            else -> 76 + (safeLevel - 4) * 14
+        }
     }
 
     /** Calculates required grid size to ensure full capacity for the target arrow count. */
     fun calculateRequiredGridSize(targetArrows: Int): Int {
-        val requiredCells = (targetArrows * 1.2f).toInt()
+        val requiredCells = (targetArrows * 1.15f).toInt()
         val calculatedSize = kotlin.math.ceil(kotlin.math.sqrt(requiredCells.toDouble())).toInt()
-        return maxOf(6, calculatedSize)
+        return maxOf(13, calculatedSize) // Minimum 13x13 grid as per trial spec
     }
 
     fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
         val safeLevel = max(1, level)
         val targetArrowCount = targetArrowCountForLevel(safeLevel)
         val neededGridSize = calculateRequiredGridSize(targetArrowCount)
-        val size = maxOf(neededGridSize, maxGridCap.coerceAtLeast(6))
+        val size = maxOf(neededGridSize, maxGridCap.coerceAtLeast(13))
 
         val rows = size
         val cols = size
@@ -180,7 +242,6 @@ object PuzzleGenerator {
             while (generatedArrows.size < targetArrowCount && failCounter < 100) {
                 failCounter++
 
-                // Find candidate head positions (hr, hc) inside shape ('X') with clear exit directions
                 val candidateHeads = mutableListOf<Triple<Int, Int, Direction>>()
 
                 for (r in 0 until rows) {
@@ -198,11 +259,10 @@ object PuzzleGenerator {
                             val hasBehind = behindR in 0 until rows && behindC in 0 until cols &&
                                     isCellPlayable(behindR, behindC, rows, cols, safeLevel) && !occupied[behindR][behindC]
 
-                            if (!hasBehind && safeLevel < 15) {
+                            if (!hasBehind && safeLevel < 10) {
                                 continue
                             }
 
-                            // Exit ray can shoot over empty space ('.') to board edge
                             var rayR = r
                             var rayC = c
                             var clearRay = true
@@ -264,11 +324,11 @@ object PuzzleGenerator {
                     tempOccupied[forbidR][forbidC] = true
                 }
 
-                if (hasBehindCell && (safeLevel < 15 || random.nextBoolean())) {
+                if (hasBehindCell && (safeLevel < 10 || random.nextBoolean())) {
                     snakingPath.add(0, Pair(behindR, behindC))
                     tempOccupied[behindR][behindC] = true
 
-                    val targetLength = if (safeLevel >= 30) random.nextInt(2) + 2 else random.nextInt(3) + 2
+                    val targetLength = if (safeLevel >= 25) random.nextInt(2) + 2 else random.nextInt(3) + 2
                     var currR = behindR
                     var currC = behindC
 
@@ -331,7 +391,6 @@ object PuzzleGenerator {
             }
         }
 
-        // Fallback: Fill remaining stencil shape ('X') cells with valid 1-cell or 2-cell arrows
         if (arrows == null) {
             val fallbackArrows = mutableListOf<Arrow>()
             val occupied = Array(rows) { BooleanArray(cols) }
