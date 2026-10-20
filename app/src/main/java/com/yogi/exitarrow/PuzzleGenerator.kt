@@ -25,13 +25,26 @@ object PuzzleGenerator {
         }
     }
 
+    /** Strict monotonic arrow count calculation: Level 1 = 10, Level 2 = 22 (+12), Level 3 = 34 (+12)... */
+    fun targetArrowCountForLevel(level: Int): Int {
+        val safeLevel = maxOf(1, level)
+        return 10 + (safeLevel - 1) * 12
+    }
+
+    /** Calculates required grid size to ensure full capacity for the target arrow count. */
+    fun calculateRequiredGridSize(targetArrows: Int): Int {
+        val requiredCells = (targetArrows * 1.15f).toInt()
+        val calculatedSize = kotlin.math.ceil(kotlin.math.sqrt(requiredCells.toDouble())).toInt()
+        return maxOf(6, calculatedSize)
+    }
+
     fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
         val safeLevel = max(1, level)
-        val maxCap = maxOf(6, maxGridCap)
-        // Monotonic grid size scaling: grows continuously with level up to maxCap (never resets!)
-        val size = (6 + (safeLevel - 1) / 8).coerceIn(6, maxCap)
-        val random = Random(safeLevel.toLong() * 7919L + 37L)
+        val targetArrowCount = targetArrowCountForLevel(safeLevel)
+        val neededGridSize = calculateRequiredGridSize(targetArrowCount)
+        val size = maxOf(neededGridSize, maxGridCap.coerceAtLeast(6))
 
+        val random = Random(safeLevel.toLong() * 7919L + 37L)
         val difficulty = difficultyForLevel(safeLevel)
 
         var arrows: MutableList<Arrow>? = null
@@ -40,8 +53,6 @@ object PuzzleGenerator {
         for (_attempt in 0 until maxAttempts) {
             val generatedArrows = mutableListOf<Arrow>()
             val occupied = Array(size) { BooleanArray(size) }
-            // Monotonic arrow target: Level 1 = ~7 arrows, Level 100 = 300+ arrows!
-            val targetArrowCount = minOf(350, 4 + safeLevel * 3)
 
             var arrowId = 1
             var failCounter = 0
@@ -57,7 +68,6 @@ object PuzzleGenerator {
                         if (occupied[r][c]) continue
 
                         for (dir in ALL_DIRECTIONS) {
-                            // Check that the cell directly behind (r, c) for direction 'dir' is free
                             val (behindR, behindC) = when (dir) {
                                 Direction.LEFT -> Pair(r, c + 1)
                                 Direction.RIGHT -> Pair(r, c - 1)
@@ -65,7 +75,10 @@ object PuzzleGenerator {
                                 Direction.DOWN -> Pair(r - 1, c)
                             }
 
-                            if (behindR !in 0 until size || behindC !in 0 until size || occupied[behindR][behindC]) {
+                            val hasBehind = behindR in 0 until size && behindC in 0 until size && !occupied[behindR][behindC]
+
+                            // Allow 1-cell or multi-cell arrows on higher levels (level >= 15) for max arrow density
+                            if (!hasBehind && safeLevel < 15) {
                                 continue
                             }
 
@@ -109,6 +122,8 @@ object PuzzleGenerator {
                     Direction.DOWN -> Pair(hr - 1, hc)
                 }
 
+                val hasBehindCell = behindR in 0 until size && behindC in 0 until size && !occupied[behindR][behindC]
+
                 // Grow snaking body backwards from head
                 val snakingPath = mutableListOf<Pair<Int, Int>>()
                 snakingPath.add(Pair(hr, hc))
@@ -130,34 +145,36 @@ object PuzzleGenerator {
                     tempOccupied[forbidR][forbidC] = true
                 }
 
-                // Step 1: Force body cell behind head so line segment entering head matches direction
-                snakingPath.add(0, Pair(behindR, behindC))
-                tempOccupied[behindR][behindC] = true
+                if (hasBehindCell && (safeLevel < 15 || random.nextBoolean())) {
+                    // Step 1: Force body cell behind head so line segment entering head matches direction
+                    snakingPath.add(0, Pair(behindR, behindC))
+                    tempOccupied[behindR][behindC] = true
 
-                val targetLength = random.nextInt(3) + 2 // Length 2 to 4 cells for higher arrow density
-                var currR = behindR
-                var currC = behindC
+                    val targetLength = if (safeLevel >= 30) random.nextInt(2) + 2 else random.nextInt(3) + 2
+                    var currR = behindR
+                    var currC = behindC
 
-                for (step in 2 until targetLength) {
-                    val neighbors = mutableListOf<Pair<Int, Int>>()
-                    val dr = intArrayOf(-1, 1, 0, 0)
-                    val dc = intArrayOf(0, 0, -1, 1)
+                    for (step in 2 until targetLength) {
+                        val neighbors = mutableListOf<Pair<Int, Int>>()
+                        val dr = intArrayOf(-1, 1, 0, 0)
+                        val dc = intArrayOf(0, 0, -1, 1)
 
-                    for (i in 0..3) {
-                        val nr = currR + dr[i]
-                        val nc = currC + dc[i]
-                        if (nr in 0 until size && nc in 0 until size && !tempOccupied[nr][nc]) {
-                            neighbors.add(Pair(nr, nc))
+                        for (i in 0..3) {
+                            val nr = currR + dr[i]
+                            val nc = currC + dc[i]
+                            if (nr in 0 until size && nc in 0 until size && !tempOccupied[nr][nc]) {
+                                neighbors.add(Pair(nr, nc))
+                            }
                         }
+
+                        if (neighbors.isEmpty()) break
+
+                        val nextCell = neighbors[random.nextInt(neighbors.size)]
+                        currR = nextCell.first
+                        currC = nextCell.second
+                        snakingPath.add(0, Pair(currR, currC)) // Append to tail (front of list)
+                        tempOccupied[currR][currC] = true
                     }
-
-                    if (neighbors.isEmpty()) break
-
-                    val nextCell = neighbors[random.nextInt(neighbors.size)]
-                    currR = nextCell.first
-                    currC = nextCell.second
-                    snakingPath.add(0, Pair(currR, currC)) // Append to tail (front of list)
-                    tempOccupied[currR][currC] = true
                 }
 
                 if (snakingPath.size >= 2) {

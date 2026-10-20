@@ -51,8 +51,6 @@ class MainActivity : Activity() {
     private var finishingLevel = false
     private var hintsUsed = 0
     private var totalLevelArrows = 0
-    private var awarded50PercentHeart = false
-    private var awarded75PercentHeart = false
 
     private var elapsedSeconds = 0
     private val timerHandler = Handler(Looper.getMainLooper())
@@ -338,8 +336,6 @@ class MainActivity : Activity() {
 
                 board.puzzle = puzzle
                 totalLevelArrows = puzzle.arrows.size
-                awarded50PercentHeart = false
-                awarded75PercentHeart = false
                 moves = 0
                 lives = 3
                 hintsUsed = 0
@@ -384,42 +380,14 @@ class MainActivity : Activity() {
         GameAudio.playArrowExit(progress.soundEnabled)
 
         val remainingActive = board.puzzle.arrows.count { it.active && it != arrow }
-        val cleared = totalLevelArrows - remainingActive
-        val clearedRatio = if (totalLevelArrows > 0) cleared.toFloat() / totalLevelArrows.toFloat() else 0f
 
         if (remainingActive == 0) {
             statusLabel.text = "🎉 LEVEL $level COMPLETED!"
             statusLabel.setTextColor(GameTheme.GOLD)
             GameAudio.playVictory(progress.soundEnabled)
         } else {
-            var milestoneText: String? = null
-
-            if (!awarded50PercentHeart && clearedRatio >= 0.5f) {
-                awarded50PercentHeart = true
-                if (lives < 3) {
-                    lives = minOf(3, lives + 1)
-                    milestoneText = "❤️ +1 HEART BONUS! (50% Milestone!)"
-                } else {
-                    milestoneText = "⭐ 50% Milestone Reached!"
-                }
-            } else if (!awarded75PercentHeart && clearedRatio >= 0.75f) {
-                awarded75PercentHeart = true
-                if (lives < 3) {
-                    lives = minOf(3, lives + 1)
-                    milestoneText = "❤️ +1 HEART BONUS! (75% Milestone!)"
-                } else {
-                    milestoneText = "⭐ 75% Milestone Reached!"
-                }
-            }
-
-            if (milestoneText != null) {
-                statusLabel.text = milestoneText
-                statusLabel.setTextColor(GameTheme.GREEN)
-                GameAudio.playVictory(progress.soundEnabled)
-            } else {
-                statusLabel.text = "Nice move!"
-                statusLabel.setTextColor(GameTheme.CYAN)
-            }
+            statusLabel.text = "Nice move!"
+            statusLabel.setTextColor(GameTheme.CYAN)
         }
 
         updateUI()
@@ -600,26 +568,25 @@ class MainActivity : Activity() {
         }
         cardLayout.addView(space1)
 
-        // Staggered Animated Stars Row
+        // Staggered Animated Stars Row (renders ONLY earned stars)
         val starsRow = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
         }
 
-        for (i in 0 until 3) {
-            val starChar = if (i < stars) "★" else "☆"
-            val starView = GameTheme.text(this, starChar, 42f, Color.rgb(255, 213, 79), true).apply {
+        for (i in 0 until stars) {
+            val starView = GameTheme.text(this, "★", 44f, Color.rgb(255, 213, 79), true).apply {
                 setPadding(8, 0, 8, 0)
             }
             starsRow.addView(starView)
 
             if (!progress.reducedMotion) {
-                val delayMs = 100L + i * 300L
+                val delayMs = 100L + i * 250L
                 starView.scaleX = 0f
                 starView.scaleY = 0f
                 starView.animate()
-                    .scaleX(1.2f)
-                    .scaleY(1.2f)
+                    .scaleX(1.25f)
+                    .scaleY(1.25f)
                     .setStartDelay(delayMs)
                     .setDuration(300)
                     .withEndAction {

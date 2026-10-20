@@ -23,9 +23,9 @@ class CandyCrushLevelMapView(
 
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val nodeRadius = 26f * density
-    private val levelSpacing = 72f * density
-    private val topMargin = 50f * density
+    private val nodeRadius = 34f * density // Bigger level circle nodes
+    private val levelSpacing = 92f * density
+    private val topMargin = 60f * density
 
     private val nodePositions = mutableListOf<Pair<Float, Float>>()
     private val clipRect = Rect()
@@ -53,24 +53,25 @@ class CandyCrushLevelMapView(
         val visibleTop = clipRect.top.toFloat() - levelSpacing * 2f
         val visibleBottom = clipRect.bottom.toFloat() + levelSpacing * 2f
 
-        // Fill background canvas with dark cosmic space theme
-        canvas.drawColor(Color.rgb(11, 16, 33))
+        // Fill background canvas with 3D deep ocean theme (#061325)
+        canvas.drawColor(Color.rgb(6, 19, 37))
 
-        // Draw ambient background stars
+        // Draw animated 3D ocean caustics & rising aquatic bubbles
+        val timeSec = System.currentTimeMillis() / 1000f
         paint.style = Paint.Style.FILL
-        paint.color = Color.argb(120, 255, 255, 255)
-        for (i in 0 until 60) {
-            val sx = ((i * 137.5f) % w)
-            val sy = ((i * 219.3f) % h)
-            if (sy in visibleTop..visibleBottom) {
-                val r = (1.2f + (i % 3) * 0.8f) * density
-                canvas.drawCircle(sx, sy, r, paint)
+        for (i in 0 until 50) {
+            val bx = ((i * 147.5f + sin(timeSec + i) * 15f) % w)
+            val by = ((i * 219.3f - timeSec * 25f) % h).let { if (it < 0) it + h else it }
+            if (by in visibleTop..visibleBottom) {
+                val r = (1.8f + (i % 4) * 1.2f) * density
+                paint.color = Color.argb(80, 68, 224, 255)
+                canvas.drawCircle(bx, by, r, paint)
             }
         }
 
         nodePositions.clear()
 
-        // Calculate positions along a winding S-curve (Level 1 at bottom, totalLevels at top)
+        // Calculate positions along a winding 3D S-curve (Level 1 at bottom, totalLevels at top)
         for (i in 1..totalLevels) {
             val index = totalLevels - i
             val y = topMargin + index * levelSpacing
@@ -105,19 +106,19 @@ class CandyCrushLevelMapView(
 
             // Glow / Shadow stroke
             paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 8f * density
-            paint.color = Color.argb(60, 68, 224, 255)
+            paint.strokeWidth = 10f * density
+            paint.color = Color.argb(70, 0, 180, 255)
             canvas.drawPath(path, paint)
 
-            // Main connection line stroke
-            paint.strokeWidth = 5f * density
+            // Main 3D ocean stream connection line stroke
+            paint.strokeWidth = 6f * density
             paint.color = GameTheme.CYAN
-            paint.pathEffect = DashPathEffect(floatArrayOf(14f * density, 10f * density), 0f)
+            paint.pathEffect = DashPathEffect(floatArrayOf(16f * density, 12f * density), 0f)
             canvas.drawPath(path, paint)
             paint.pathEffect = null
         }
 
-        // Draw circular level nodes (only visible ones)
+        // Draw circular 3D level nodes (only visible ones)
         for (i in 1..totalLevels) {
             val pos = nodePositions[i - 1]
             val x = pos.first
@@ -129,17 +130,22 @@ class CandyCrushLevelMapView(
             val isCurrent = i == currentLevel
             val stars = if (isUnlocked) getBestStars(i) else 0
 
-            // Draw current level glowing aura ring
+            // 1. Draw 3D Under-Shadow for depth elevation
+            paint.style = Paint.Style.FILL
+            paint.color = Color.argb(160, 2, 8, 18)
+            canvas.drawCircle(x, y + 5f * density, nodeRadius, paint)
+
+            // 2. Draw current level glowing aura ring
             if (isCurrent) {
                 paint.style = Paint.Style.STROKE
-                paint.strokeWidth = 4f * density
+                paint.strokeWidth = 5f * density
                 paint.color = GameTheme.GOLD
-                val pulse = 1f + 0.10f * sin(System.currentTimeMillis() / 160.0).toFloat()
+                val pulse = 1f + 0.12f * sin(System.currentTimeMillis() / 150.0).toFloat()
                 canvas.drawCircle(x, y, nodeRadius * 1.35f * pulse, paint)
                 postInvalidateOnAnimation()
             }
 
-            // Draw node circle background
+            // 3. Draw node circle background
             paint.style = Paint.Style.FILL
             paint.color = when {
                 isCurrent -> GameTheme.GOLD
@@ -148,14 +154,14 @@ class CandyCrushLevelMapView(
                     1 -> GameTheme.PURPLE
                     else -> GameTheme.GREEN
                 }
-                else -> Color.rgb(25, 32, 48)
+                else -> Color.rgb(20, 28, 44)
             }
             canvas.drawCircle(x, y, nodeRadius, paint)
 
-            // Draw node border stroke
+            // 4. Draw 3D metallic/crystal border stroke
             paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 2.5f * density
-            paint.color = if (isUnlocked) GameTheme.WHITE else Color.rgb(55, 68, 98)
+            paint.strokeWidth = 3.5f * density
+            paint.color = if (isUnlocked) GameTheme.WHITE else Color.rgb(45, 58, 88)
             canvas.drawCircle(x, y, nodeRadius, paint)
 
             // Draw text/icon inside node
@@ -165,40 +171,46 @@ class CandyCrushLevelMapView(
             val diffName = PuzzleGenerator.difficultyForLevel(i)
 
             if (isUnlocked) {
-                paint.textSize = 16f * density
+                paint.textSize = 20f * density
                 paint.color = if (isCurrent) GameTheme.BACKGROUND else GameTheme.WHITE
                 paint.isFakeBoldText = true
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
                 canvas.drawText("$i", x, textY, paint)
 
-                // Draw difficulty tier & star rating below node
-                paint.textSize = 10f * density
+                // Draw BOLD difficulty tier name & star rating below node
+                paint.textSize = 12f * density
+                paint.isFakeBoldText = true // BOLD for difficulty names
                 paint.color = if (i % 5 == 0) GameTheme.RED else GameTheme.CYAN
-                canvas.drawText(diffName, x, y + nodeRadius + 13f * density, paint)
+                canvas.drawText(diffName, x, y + nodeRadius + 16f * density, paint)
 
-                paint.textSize = 10f * density
-                paint.color = GameTheme.GOLD
+                // Only show earned stars (hide unearned stars)
                 val starStr = when (stars) {
                     3 -> "★★★"
-                    2 -> "★★☆"
-                    1 -> "★☆☆"
-                    else -> "☆☆☆"
+                    2 -> "★★"
+                    1 -> "★"
+                    else -> "" // Hide completely if 0 stars
                 }
-                canvas.drawText(starStr, x, y + nodeRadius + 25f * density, paint)
+                if (starStr.isNotEmpty()) {
+                    paint.textSize = 12f * density
+                    paint.color = GameTheme.GOLD
+                    canvas.drawText(starStr, x, y + nodeRadius + 30f * density, paint)
+                }
             } else {
-                paint.textSize = 13f * density
+                paint.textSize = 16f * density
                 paint.color = GameTheme.MUTED
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
                 canvas.drawText("🔒", x, textY, paint)
 
-                // Draw difficulty tier & "LOCKED" label below locked node
-                paint.textSize = 9f * density
-                paint.color = Color.rgb(120, 135, 165)
-                canvas.drawText(diffName, x, y + nodeRadius + 12f * density, paint)
+                // Draw BOLD difficulty tier name & "LOCKED" label below locked node
+                paint.textSize = 11f * density
+                paint.isFakeBoldText = true // BOLD for difficulty names
+                paint.color = Color.rgb(130, 148, 180)
+                canvas.drawText(diffName, x, y + nodeRadius + 15f * density, paint)
 
-                paint.textSize = 8f * density
+                paint.textSize = 9f * density
+                paint.isFakeBoldText = true
                 paint.color = Color.rgb(90, 105, 135)
-                canvas.drawText("LOCKED", x, y + nodeRadius + 23f * density, paint)
+                canvas.drawText("LOCKED", x, y + nodeRadius + 28f * density, paint)
             }
         }
     }

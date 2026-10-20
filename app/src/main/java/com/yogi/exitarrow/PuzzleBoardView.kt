@@ -9,7 +9,9 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
+import android.view.GestureDetector
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import java.util.IdentityHashMap
@@ -45,6 +47,39 @@ class PuzzleBoardView(context: Context) : View(context) {
     private var top = 0f
     private var boardW = 0f
     private var boardH = 0f
+
+    // Pinch-to-zoom & Double-tap zoom state
+    var scaleFactor = 1.0f
+    private val minScale = 0.85f
+    private val maxScale = 4.0f
+    private var pivotFocusX = 0f
+    private var pivotFocusY = 0f
+
+    private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        override fun onScale(detector: ScaleGestureDetector): Boolean {
+            scaleFactor *= detector.scaleFactor
+            scaleFactor = scaleFactor.coerceIn(minScale, maxScale)
+            pivotFocusX = detector.focusX
+            pivotFocusY = detector.focusY
+            invalidate()
+            return true
+        }
+    })
+
+    fun animateZoomTo(targetScale: Float, pivotX: Float = width / 2f, pivotY: Float = height / 2f) {
+        val startScale = scaleFactor
+        ValueAnimator.ofFloat(startScale, targetScale).apply {
+            duration = 320L
+            interpolator = DecelerateInterpolator()
+            addUpdateListener { anim ->
+                scaleFactor = anim.animatedValue as Float
+                pivotFocusX = pivotX
+                pivotFocusY = pivotY
+                invalidate()
+            }
+            start()
+        }
+    }
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
@@ -180,34 +215,12 @@ class PuzzleBoardView(context: Context) : View(context) {
         left = (width - boardW) / 2f
         top = (height - boardH) / 2f
 
-        rect.set(left, top, left + boardW, top + boardH)
-        paint.style = Paint.Style.FILL
-        paint.color = boardBackgroundColor
-        canvas.drawRoundRect(rect, 14f * density, 14f * density, paint)
+        canvas.save()
+        val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
+        val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
+        canvas.scale(scaleFactor, scaleFactor, pX, pY)
 
-        // Draw animated colorful neon glow border around the board
-        val timeMs = System.currentTimeMillis()
-        val hue = (timeMs / 25f) % 360f
-        val glowColor = android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.75f, 0.95f))
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 2.5f * density
-        paint.color = glowColor
-        paint.setShadowLayer(8f * density, 0f, 0f, glowColor)
-        canvas.drawRoundRect(rect, 14f * density, 14f * density, paint)
-        paint.clearShadowLayer()
-
-        // Draw Dot Grid View (minute subtle dots at cell centers)
-        paint.style = Paint.Style.FILL
-        for (r in 0 until puzzle.rows) {
-            for (c in 0 until puzzle.cols) {
-                val cx = left + (c + 0.5f) * cell
-                val cy = top + (r + 0.5f) * cell
-                paint.color = 0xFF22324D.toInt()
-                canvas.drawCircle(cx, cy, 1.2f * density, paint)
-            }
-        }
-
-        // Draw snaking multi-cell arrows with path-following slithering animation
+        // Draw floating snaking multi-cell arrows directly in 2D/3D space
         puzzle.arrows.forEach { arrow ->
             if (!arrow.active && !isArrowAnimating(arrow)) return@forEach
             if (arrow.path.isEmpty()) return@forEach
@@ -374,17 +387,24 @@ class PuzzleBoardView(context: Context) : View(context) {
             paint.clearShadowLayer()
         }
 
+        canvas.restore()
         postInvalidateOnAnimation()
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) return true
-        if (event.actionMasked != MotionEvent.ACTION_UP) return true
+        scaleDetector.onTouchEvent(event)
 
+        if (event.actionMasked != MotionEvent.ACTION_UP) return true
         if (cell <= 0f) return true
 
-        val col = ((event.x - left) / cell).toInt()
-        val row = ((event.y - top) / cell).toInt()
+        val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
+        val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
+
+        val localX = (event.x - pX) / scaleFactor + pX
+        val localY = (event.y - pY) / scaleFactor + pY
+
+        val col = ((localX - left) / cell).toInt()
+        val row = ((localY - top) / cell).toInt()
 
         if (row !in 0 until puzzle.rows || col !in 0 until puzzle.cols) {
             performClick()
