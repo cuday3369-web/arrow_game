@@ -28,5 +28,6 @@ android {
 
 dependencies {
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.lottie)
     testImplementation("junit:junit:4.13.2")
 }

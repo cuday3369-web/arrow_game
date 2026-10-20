@@ -162,6 +162,9 @@ class MainActivity : Activity() {
         )
         brand.gravity = Gravity.CENTER
         brand.setOnClickListener { showSettingsDialog() }
+        if (!progress.reducedMotion) {
+            GameEffects.openingLogoBounceDropIn(brand)
+        }
 
         starsLabel = GameTheme.text(
             this, "★ ${progress.totalStars}", 15f, GameTheme.GOLD, true
@@ -251,6 +254,14 @@ class MainActivity : Activity() {
 
         hintButton = boxButton("💡 HINT", GameTheme.GOLD)
         hintButton.setOnClickListener { showHint() }
+        if (!progress.reducedMotion) {
+            GameEffects.organicBreathingGlow(
+                view = hintButton,
+                minAlpha = 0.85f,
+                maxAlpha = 1.0f,
+                durationMs = 1800L
+            )
+        }
 
         val boxParams = LinearLayout.LayoutParams(0, GameTheme.dp(this, 46), 1f)
 
@@ -319,8 +330,8 @@ class MainActivity : Activity() {
         val maxResponsiveGridSize = minOf((boardW / minCellPx), (boardH / minCellPx)).coerceIn(6, 24)
 
         executor.execute {
-            val remotePuzzle = api.fetchLevel(level)
-            val puzzle = remotePuzzle ?: PuzzleGenerator.generate(level, maxResponsiveGridSize)
+            // Generate level instantly (<10ms) without offline network timeout delay
+            val puzzle = PuzzleGenerator.generate(level, maxResponsiveGridSize)
 
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
@@ -339,11 +350,7 @@ class MainActivity : Activity() {
                 }
 
                 loading = false
-                statusLabel.text = if (remotePuzzle == null) {
-                    "${puzzle.difficulty} · ${puzzle.rows}×${puzzle.cols} Grid"
-                } else {
-                    "${puzzle.difficulty} · Find your first move."
-                }
+                statusLabel.text = "${puzzle.difficulty} · ${puzzle.rows}×${puzzle.cols} Grid"
 
                 updateUI()
                 GameEffects.celebration(board, progress.reducedMotion)
@@ -358,6 +365,9 @@ class MainActivity : Activity() {
         if (!board.isClear(arrow)) {
             lives--
             board.animateBlockedArrow(arrow)
+            if (!progress.reducedMotion) {
+                GameEffects.shake(board)
+            }
             statusLabel.text = "Blocked! Look for an arrow with a clear path."
             statusLabel.setTextColor(GameTheme.RED)
             GameAudio.playBlocked(progress.soundEnabled)
@@ -505,42 +515,253 @@ class MainActivity : Activity() {
             else -> 1
         }
 
+        val oldStars = progress.totalStars
         storage.saveBestMoves(level, moves)
         storage.saveBestStars(level, stars)
         storage.addStars(stars)
         storage.unlockLevel(level + 1)
 
         progress = storage.loadProgress()
-        starsLabel.text = "★ ${progress.totalStars}"
+        if (!progress.reducedMotion) {
+            GameEffects.numberTicker(starsLabel, oldStars, progress.totalStars, prefix = "★ ")
+        } else {
+            starsLabel.text = "★ ${progress.totalStars}"
+        }
 
         confettiOverlay.start()
         GameAudio.playVictory(progress.soundEnabled)
         GameEffects.celebration(board, progress.reducedMotion)
         GameEffects.vibrate(this, progress.vibrationEnabled, 100)
 
-        val nextLevel = level + 1
+        showLevelCompletedDialog(stars, level + 1)
+    }
 
-        AlertDialog.Builder(this)
-            .setTitle("🎉 LEVEL $level CLEARED!")
-            .setMessage(
-                "✨ Level $level Completed!\n" +
-                        "🔓 Next Unlocked: Level $nextLevel\n\n" +
-                        "⏱ Time: ${String.format(java.util.Locale.US, "%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)}\n" +
-                        "★ Stars Earned: ${"★".repeat(stars)}\n" +
-                        "🎯 Moves: $moves\n\n" +
-                        "Ready to start Level $nextLevel?"
+    private fun showLevelCompletedDialog(stars: Int, nextLevel: Int) {
+        val dialog = android.app.Dialog(this)
+        dialog.requestWindowFeature(android.view.Window.FEATURE_NO_TITLE)
+        dialog.setCancelable(false)
+
+        val cardLayout = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(
+                GameTheme.dp(this@MainActivity, 18),
+                GameTheme.dp(this@MainActivity, 20),
+                GameTheme.dp(this@MainActivity, 18),
+                GameTheme.dp(this@MainActivity, 20)
             )
-            .setCancelable(false)
-            .setPositiveButton("▶ NEXT LEVEL ($nextLevel)") { _, _ ->
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(28, 35, 51)) // #1C2333 Dark Wood/Slate Card
+                cornerRadius = GameTheme.dp(this@MainActivity, 20).toFloat()
+                setStroke(GameTheme.dp(this@MainActivity, 3), Color.rgb(255, 200, 70)) // #FFC846 Gold border
+            }
+        }
+
+        // Top Winged Ribbon Header Banner (Matching attached artwork)
+        val bannerContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            setPadding(0, 4, 0, 4)
+        }
+
+        val leftWing = GameTheme.text(this, "🪽", 28f).apply {
+            rotation = -12f
+        }
+
+        val ribbonText = GameTheme.text(this, "👑 LEVEL $level COMPLETED 👑", 15f, Color.rgb(255, 213, 79), true).apply {
+            setPadding(
+                GameTheme.dp(this@MainActivity, 14),
+                GameTheme.dp(this@MainActivity, 8),
+                GameTheme.dp(this@MainActivity, 14),
+                GameTheme.dp(this@MainActivity, 8)
+            )
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(Color.rgb(130, 40, 190), Color.rgb(75, 20, 120), Color.rgb(130, 40, 190)) // Royal Purple Ribbon
+            ).apply {
+                cornerRadius = GameTheme.dp(this@MainActivity, 20).toFloat()
+                setStroke(GameTheme.dp(this@MainActivity, 2), Color.rgb(255, 213, 79))
+            }
+        }
+
+        val rightWing = GameTheme.text(this, "🪽", 28f).apply {
+            rotation = 12f
+            scaleX = -1f
+        }
+
+        bannerContainer.addView(leftWing)
+        bannerContainer.addView(ribbonText)
+        bannerContainer.addView(rightWing)
+
+        cardLayout.addView(bannerContainer)
+
+        val space1 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, GameTheme.dp(this@MainActivity, 14))
+        }
+        cardLayout.addView(space1)
+
+        // Staggered Animated Stars Row
+        val starsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        for (i in 0 until 3) {
+            val starChar = if (i < stars) "★" else "☆"
+            val starView = GameTheme.text(this, starChar, 42f, Color.rgb(255, 213, 79), true).apply {
+                setPadding(8, 0, 8, 0)
+            }
+            starsRow.addView(starView)
+
+            if (!progress.reducedMotion) {
+                val delayMs = 100L + i * 300L
+                starView.scaleX = 0f
+                starView.scaleY = 0f
+                starView.animate()
+                    .scaleX(1.2f)
+                    .scaleY(1.2f)
+                    .setStartDelay(delayMs)
+                    .setDuration(300)
+                    .withEndAction {
+                        starView.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .setDuration(150)
+                            .start()
+                    }
+                    .start()
+            }
+        }
+        cardLayout.addView(starsRow)
+
+        val space2 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, GameTheme.dp(this@MainActivity, 16))
+        }
+        cardLayout.addView(space2)
+
+        // Stats Box (#272D3D)
+        val statsBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(
+                GameTheme.dp(this@MainActivity, 16),
+                GameTheme.dp(this@MainActivity, 14),
+                GameTheme.dp(this@MainActivity, 16),
+                GameTheme.dp(this@MainActivity, 14)
+            )
+            background = GradientDrawable().apply {
+                setColor(Color.rgb(39, 45, 61)) // #272D3D
+                cornerRadius = GameTheme.dp(this@MainActivity, 12).toFloat()
+            }
+        }
+
+        val row1 = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+        val timeStr = String.format(java.util.Locale.US, "%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)
+        val timeTxt = GameTheme.text(this, "⏱ Time: $timeStr", 14f, Color.WHITE)
+        val spaceBetween = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(GameTheme.dp(this@MainActivity, 16), 1)
+        }
+        val movesTxt = GameTheme.text(this, "🎯 Moves: $moves", 14f, Color.WHITE)
+
+        row1.addView(timeTxt)
+        row1.addView(spaceBetween)
+        row1.addView(movesTxt)
+        statsBox.addView(row1)
+
+        val spaceInBox = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, GameTheme.dp(this@MainActivity, 8))
+        }
+        statsBox.addView(spaceInBox)
+
+        val unlockedTxt = GameTheme.text(this, "🔓 Unlocked: Level $nextLevel", 14f, Color.WHITE).apply {
+            gravity = Gravity.CENTER
+        }
+        statsBox.addView(unlockedTxt)
+
+        cardLayout.addView(statsBox, LinearLayout.LayoutParams(-1, -2))
+
+        val space3 = View(this).apply {
+            layoutParams = LinearLayout.LayoutParams(1, GameTheme.dp(this@MainActivity, 20))
+        }
+        cardLayout.addView(space3)
+
+        // Action Buttons
+        val nextBtn = boxButton("▶ NEXT LEVEL ($nextLevel)", Color.rgb(255, 213, 79)).apply {
+            setTextColor(Color.BLACK)
+            setOnClickListener {
+                dialog.dismiss()
                 loadLevel(nextLevel)
             }
-            .setNeutralButton("🍭 LEVEL MAP") { _, _ ->
+        }
+        if (!progress.reducedMotion) {
+            GameEffects.pulse(nextBtn)
+        }
+
+        val mapBtn = boxButton("🌀 LEVEL MAP", Color.rgb(77, 208, 225)).apply {
+            setTextColor(Color.BLACK)
+            setOnClickListener {
+                dialog.dismiss()
                 showCandyCrushLevelMapDialog()
             }
-            .setNegativeButton("↺ REPLAY") { _, _ ->
+        }
+
+        val replayBtn = boxButton("↻ REPLAY LEVEL", Color.WHITE).apply {
+            setTextColor(Color.BLACK)
+            setOnClickListener {
+                dialog.dismiss()
                 loadLevel(level)
             }
-            .show()
+        }
+
+        val btnParams = LinearLayout.LayoutParams(-1, GameTheme.dp(this, 50)).apply {
+            bottomMargin = GameTheme.dp(this@MainActivity, 12)
+        }
+
+        cardLayout.addView(nextBtn, btnParams)
+        cardLayout.addView(mapBtn, btnParams)
+        cardLayout.addView(replayBtn, LinearLayout.LayoutParams(-1, GameTheme.dp(this, 50)))
+
+        // Wrap card in a container frame explicitly sized MATCH_PARENT to prevent particle clipping
+        val dialogFrame = FrameLayout(this).apply {
+            layoutParams = android.view.ViewGroup.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        }
+        val dialogConfetti = ConfettiView(this)
+        val starCelebration = StarCelebrationView(this)
+
+        val cardParams = FrameLayout.LayoutParams(
+            (resources.displayMetrics.widthPixels * 0.88).toInt(),
+            FrameLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            gravity = Gravity.CENTER
+        }
+
+        // Add views in Z-order: Floating Stars (back), Card (middle), Confetti (front)
+        dialogFrame.addView(starCelebration, FrameLayout.LayoutParams(-1, -1))
+        dialogFrame.addView(cardLayout, cardParams)
+        dialogFrame.addView(dialogConfetti, FrameLayout.LayoutParams(-1, -1))
+
+        dialog.setContentView(dialogFrame)
+        dialog.window?.setLayout(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.argb(200, 9, 14, 29)))
+
+        dialog.show()
+
+        // Fire particle and bounce animations
+        if (!progress.reducedMotion) {
+            dialogConfetti.start()
+            starCelebration.start()
+            GameEffects.inertialBounce(cardLayout)
+            GameEffects.pulse(nextBtn)
+        }
     }
 
     private fun buyHeartWithStars() {
@@ -561,10 +782,14 @@ class MainActivity : Activity() {
             .setTitle("❤️ Exchange 10 Stars for 1 Heart?")
             .setMessage("Current Stars: ★ ${progress.totalStars}\nCurrent Hearts: $lives/3\n\nWould you like to buy 1 Heart for 10 Stars?")
             .setPositiveButton("BUY 1 HEART (★ 10)") { _, _ ->
+                val oldStars = progress.totalStars
                 storage.addStars(-10)
                 progress = storage.loadProgress()
                 lives = minOf(3, lives + 1)
                 updateUI()
+                if (!progress.reducedMotion) {
+                    GameEffects.numberTicker(starsLabel, oldStars, progress.totalStars, prefix = "★ ")
+                }
                 GameAudio.playVictory(progress.soundEnabled)
                 Toast.makeText(
                     this,

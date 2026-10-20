@@ -87,9 +87,47 @@ object GameEffects {
 
     /** Makes a title bounce into view. */
     fun popIn(view: View) {
+        inertialBounce(view)
+    }
+
+    /** Opening Logo / Title Drop-In with elastic bounce physics. */
+    fun openingLogoBounceDropIn(view: View, delayMs: Long = 80L) {
         view.animate().cancel()
-        view.scaleX = 0.45f
-        view.scaleY = 0.45f
+        view.translationY = -80f
+        view.scaleX = 0.5f
+        view.scaleY = 0.5f
+        view.alpha = 0f
+        view.visibility = View.VISIBLE
+
+        view.animate()
+            .translationY(0f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .alpha(1f)
+            .setStartDelay(delayMs)
+            .setDuration(550)
+            .setInterpolator(OvershootInterpolator(2.5f))
+            .start()
+    }
+
+    /** Gentle floating wiggle animation for opening title logos, background elements, or start buttons. */
+    fun gentleIdleWiggle(view: View, floatDistanceDp: Float = 5f): ObjectAnimator {
+        val density = view.resources.displayMetrics.density
+        val distancePx = floatDistanceDp * density
+        return ObjectAnimator.ofFloat(view, View.TRANSLATION_Y, 0f, -distancePx, 0f).apply {
+            duration = 2400L
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.RESTART
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    /** Bouncy physics inertial scale animation for badges, stars, and pop-ups with optional delay. */
+    fun inertialBounce(view: View, startDelayMs: Long = 0L, tension: Float = 2.2f) {
+        view.animate().cancel()
+        view.scaleX = 0.25f
+        view.scaleY = 0.25f
         view.alpha = 0f
         view.visibility = View.VISIBLE
 
@@ -97,9 +135,17 @@ object GameEffects {
             .alpha(1f)
             .scaleX(1f)
             .scaleY(1f)
+            .setStartDelay(startDelayMs)
             .setDuration(450)
-            .setInterpolator(OvershootInterpolator(1.5f))
+            .setInterpolator(OvershootInterpolator(tension))
             .start()
+    }
+
+    /** Staggered entrance pop-in for multiple UI elements in sequence. */
+    fun staggeredPopIn(views: List<View>, stepDelayMs: Long = 120L) {
+        views.forEachIndexed { index, v ->
+            inertialBounce(v, startDelayMs = index * stepDelayMs)
+        }
     }
 
     /** Brief shake for a blocked move or invalid action. */
@@ -131,23 +177,50 @@ object GameEffects {
             .start()
     }
 
-    /** Animate a score or reward number from its current value to its target. */
+    /** Animate a score or reward number ticker dynamically with comma formatting (e.g. "1,250"). */
+    fun numberTicker(
+        view: TextView,
+        from: Int,
+        to: Int,
+        prefix: String = "",
+        suffix: String = ""
+    ): ValueAnimator {
+        return ValueAnimator.ofInt(from, to).apply {
+            duration = 900
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { animation ->
+                val value = animation.animatedValue as Int
+                val formatted = String.format(java.util.Locale.US, "%,d", value)
+                view.text = "$prefix$formatted$suffix"
+            }
+            start()
+        }
+    }
+
+    /** Organic breathing glow / pulsing alpha animation for mythic & epic active rewards. */
+    fun organicBreathingGlow(
+        view: View,
+        minAlpha: Float = 0.55f,
+        maxAlpha: Float = 1.0f,
+        durationMs: Long = 1400L
+    ): ObjectAnimator {
+        view.alpha = minAlpha
+        return ObjectAnimator.ofFloat(view, View.ALPHA, minAlpha, maxAlpha, minAlpha).apply {
+            duration = durationMs
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.RESTART
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    /** Legacy countUp alias pointing to numberTicker. */
     fun countUp(
         view: TextView,
         from: Int,
         to: Int,
         suffix: String = ""
-    ): ValueAnimator {
-        return ValueAnimator.ofInt(from, to).apply {
-            duration = 850
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener { animation ->
-                val value = animation.animatedValue as Int
-                view.text = "$value$suffix"
-            }
-            start()
-        }
-    }
+    ): ValueAnimator = numberTicker(view, from, to, prefix = "", suffix = suffix)
 
     /** A star-like celebratory entrance for a reward view. */
     fun rewardPop(view: View) {
