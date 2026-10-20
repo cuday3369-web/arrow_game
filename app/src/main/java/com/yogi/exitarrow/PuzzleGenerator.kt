@@ -14,34 +14,34 @@ object PuzzleGenerator {
 
     fun difficultyForLevel(level: Int): String {
         val safeLevel = maxOf(1, level)
-        return when (safeLevel % 5) {
-            1 -> "Easy"
-            2 -> "Medium"
-            3 -> "Hard"
-            4 -> "Super Hard"
-            0 -> "Unbeatable"
-            else -> "Easy"
+        return when {
+            safeLevel <= 5 -> "Beginner"
+            safeLevel <= 15 -> "Easy"
+            safeLevel <= 30 -> "Medium"
+            safeLevel <= 60 -> "Hard"
+            safeLevel <= 100 -> "Super Hard"
+            safeLevel <= 150 -> "Expert"
+            else -> "Master 300+"
         }
     }
 
     fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
         val safeLevel = max(1, level)
         val maxCap = maxOf(6, maxGridCap)
-        // Responsive grid size expands smoothly across 12-level cycles up to device maxCap
-        val levelInBlock = ((safeLevel - 1) % 12) + 1
-        val size = (6 + (levelInBlock - 1) * (maxCap - 6) / 11).coerceIn(6, maxCap)
+        // Monotonic grid size scaling: grows continuously with level up to maxCap (never resets!)
+        val size = (6 + (safeLevel - 1) / 8).coerceIn(6, maxCap)
         val random = Random(safeLevel.toLong() * 7919L + 37L)
 
-        val rem = if (safeLevel % 5 == 0) 5 else (safeLevel % 5)
         val difficulty = difficultyForLevel(safeLevel)
 
         var arrows: MutableList<Arrow>? = null
-        val maxAttempts = 100
+        val maxAttempts = 150
 
         for (_attempt in 0 until maxAttempts) {
             val generatedArrows = mutableListOf<Arrow>()
             val occupied = Array(size) { BooleanArray(size) }
-            val targetArrowCount = 3 * size + size * rem + 6
+            // Monotonic arrow target: Level 1 = ~7 arrows, Level 100 = 300+ arrows!
+            val targetArrowCount = minOf(350, 4 + safeLevel * 3)
 
             var arrowId = 1
             var failCounter = 0
@@ -199,7 +199,7 @@ object PuzzleGenerator {
             }
         }
 
-        // Fallback simple 2-cell arrows if complex generation exceeded attempts
+        // Fallback simple arrows filling remaining capacity if complex generation exceeded attempts
         if (arrows == null) {
             val fallbackArrows = mutableListOf<Arrow>()
             val occupied = Array(size) { BooleanArray(size) }
@@ -207,6 +207,7 @@ object PuzzleGenerator {
             for (r in 0 until size) {
                 for (c in 0 until size) {
                     if (occupied[r][c]) continue
+                    var placed = false
                     for (dir in ALL_DIRECTIONS) {
                         val (br, bc) = when (dir) {
                             Direction.LEFT -> Pair(r, c + 1)
@@ -225,8 +226,21 @@ object PuzzleGenerator {
                                     color = GameTheme.ARROW_COLORS[id % GameTheme.ARROW_COLORS.size]
                                 )
                             )
+                            placed = true
                             break
                         }
+                    }
+                    if (!placed && !occupied[r][c]) {
+                        val dir = ALL_DIRECTIONS[id % ALL_DIRECTIONS.size]
+                        occupied[r][c] = true
+                        fallbackArrows.add(
+                            Arrow(
+                                id = id++,
+                                path = listOf(Pair(r, c)),
+                                direction = dir,
+                                color = GameTheme.ARROW_COLORS[id % GameTheme.ARROW_COLORS.size]
+                            )
+                        )
                     }
                 }
             }
