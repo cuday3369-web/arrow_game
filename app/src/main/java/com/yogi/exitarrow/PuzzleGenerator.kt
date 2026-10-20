@@ -356,6 +356,23 @@ object PuzzleGenerator {
                     }
                 }
 
+                if (snakingPath.size == 1) {
+                    val (hr, hc) = snakingPath[0]
+                    val br = when (dir) {
+                        Direction.UP -> (hr + 1).coerceAtMost(rows - 1)
+                        Direction.DOWN -> (hr - 1).coerceAtLeast(0)
+                        else -> hr
+                    }
+                    val bc = when (dir) {
+                        Direction.LEFT -> (hc + 1).coerceAtMost(cols - 1)
+                        Direction.RIGHT -> (hc - 1).coerceAtLeast(0)
+                        else -> hc
+                    }
+                    if (br != hr || bc != hc) {
+                        snakingPath.add(0, Pair(br, bc))
+                    }
+                }
+
                 if (snakingPath.size >= 1) {
                     snakingPath.forEach { (pr, pc) -> occupied[pr][pc] = true }
 
@@ -423,11 +440,22 @@ object PuzzleGenerator {
                     }
                     if (!placed && !occupied[r][c]) {
                         val dir = ALL_DIRECTIONS[id % ALL_DIRECTIONS.size]
+                        val br = when (dir) {
+                            Direction.UP -> (r + 1).coerceAtMost(rows - 1)
+                            Direction.DOWN -> (r - 1).coerceAtLeast(0)
+                            else -> r
+                        }
+                        val bc = when (dir) {
+                            Direction.LEFT -> (c + 1).coerceAtMost(cols - 1)
+                            Direction.RIGHT -> (c - 1).coerceAtLeast(0)
+                            else -> c
+                        }
                         occupied[r][c] = true
+                        if (br != r || bc != c) occupied[br][bc] = true
                         fallbackArrows.add(
                             Arrow(
                                 id = id++,
-                                path = listOf(Pair(r, c)),
+                                path = if (br != r || bc != c) listOf(Pair(br, bc), Pair(r, c)) else listOf(Pair(r, c)),
                                 direction = dir,
                                 color = GameTheme.ARROW_COLORS[id % GameTheme.ARROW_COLORS.size]
                             )

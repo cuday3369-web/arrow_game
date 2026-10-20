@@ -342,21 +342,21 @@ class PuzzleBoardView(context: Context) : View(context) {
                 }
             }
 
-            // Draw refined, sleek snaking body pipe stroke (reduced thickness)
+            // Draw bold, prominent snaking body pipe stroke
             paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeJoin = Paint.Join.ROUND
 
-            // Glow shadow layer (subtle glow)
-            paint.strokeWidth = cell * 0.08f * pulse
+            // Glow shadow layer (vibrant glow)
+            paint.strokeWidth = cell * 0.22f * pulse
             paint.color = color
-            paint.alpha = (arrow.alpha * 25).toInt().coerceIn(0, 255)
-            paint.setShadowLayer(2f * density, 0f, 0f, color)
+            paint.alpha = (arrow.alpha * 35).toInt().coerceIn(0, 255)
+            paint.setShadowLayer(4f * density, 0f, 0f, color)
             canvas.drawPath(snakingPath, paint)
             paint.clearShadowLayer()
 
-            // Main pipe stroke (sleek, thin & refined tail)
-            paint.strokeWidth = cell * 0.055f * pulse
+            // Main pipe stroke (bold & prominent arrow body/tail)
+            paint.strokeWidth = cell * 0.15f * pulse
             paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
             canvas.drawPath(snakingPath, paint)
 
@@ -364,8 +364,8 @@ class PuzzleBoardView(context: Context) : View(context) {
             val headPt = animatedPoints.last()
             val hx = headPt.x
             val hy = headPt.y
-            val headLen = cell * 0.18f * pulse
-            val headWidth = cell * 0.12f * pulse
+            val headLen = cell * 0.28f * pulse
+            val headWidth = cell * 0.20f * pulse
 
             val headPath = Path()
             when (arrow.direction) {
