@@ -5,6 +5,7 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
@@ -219,6 +220,21 @@ class PuzzleBoardView(context: Context) : View(context) {
         val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
         val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
         canvas.scale(scaleFactor, scaleFactor, pX, pY)
+
+        val isNight = GameTheme.isNightMode(context)
+
+        // Draw adaptive Dot Grid View (light white in dark mode, light black in light mode)
+        paint.style = Paint.Style.FILL
+        val dotColor = if (isNight) Color.argb(65, 255, 255, 255) else Color.argb(45, 0, 0, 0)
+
+        for (r in 0 until puzzle.rows) {
+            for (c in 0 until puzzle.cols) {
+                val cx = left + (c + 0.5f) * cell
+                val cy = top + (r + 0.5f) * cell
+                paint.color = dotColor
+                canvas.drawCircle(cx, cy, 1.2f * density, paint)
+            }
+        }
 
         // Draw floating snaking multi-cell arrows directly in 2D/3D space
         puzzle.arrows.forEach { arrow ->

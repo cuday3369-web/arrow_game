@@ -539,6 +539,22 @@ class ColorfulBackgroundView(context: Context) : View(context) {
         val h = height.toFloat().coerceAtLeast(1f)
         val elapsed = (System.currentTimeMillis() - startTime) / 1000f
 
+        val isNight = GameTheme.isNightMode(context)
+
+        // Adaptive background base: Dark mode (#090E1D) or Light mode (#F0F4F9)
+        canvas.drawColor(if (isNight) Color.rgb(9, 14, 29) else Color.rgb(240, 244, 249))
+
+        // Adaptive ambient dots (Light white in Dark Mode, Light black in Light Mode)
+        paint.style = Paint.Style.FILL
+        paint.color = if (isNight) Color.argb(45, 255, 255, 255) else Color.argb(35, 0, 0, 0)
+        
+        for (i in 0 until 60) {
+            val dx = ((i * 137.5f) % w)
+            val dy = ((i * 219.3f) % h)
+            val r = (1.5f + (i % 3) * 0.8f) * density
+            canvas.drawCircle(dx, dy, r, paint)
+        }
+
         orbs.forEach { orb ->
             val x = w * ((orb.xRatio + sin(elapsed * 0.18f + orb.phase) * 0.12f).mod(1f))
             val y = h * ((orb.yRatio + cos(elapsed * 0.15f + orb.phase) * 0.10f).mod(1f))

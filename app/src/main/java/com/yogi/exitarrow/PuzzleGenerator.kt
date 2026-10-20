@@ -12,6 +12,84 @@ object PuzzleGenerator {
         Direction.DOWN
     )
 
+    // 2D Binary Masks: 'X' means playable shape cell, '.' means empty exit space.
+    private val MASK_HEART = arrayOf(
+        "..XXX....XXX..",
+        ".XXXXX..XXXXX.",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        ".XXXXXXXXXXXX.",
+        "..XXXXXXXXXX..",
+        "...XXXXXXXX...",
+        "....XXXXXX....",
+        "......XX......"
+    )
+
+    private val MASK_DOG = arrayOf(
+        "...XX......XX.",
+        "..XXX.....XXXX",
+        "..XXXX...XXXXX",
+        "...XXXXXXXXXX.",
+        "....XXXXXXXX..",
+        "....XXXXXXXX..",
+        "....XXXXXXXX..",
+        "....XXX..XXX..",
+        "...XXX....XXX.",
+        "...XXX....XXX."
+    )
+
+    private val MASK_BIRD = arrayOf(
+        "......XX......",
+        "....XXXX......",
+        "...XXXXXX.....",
+        "XXXXXXXXXXXX..",
+        ".XXXXXXXXXXXXX",
+        "..XXXXXXXXXXX.",
+        "....XXXXXXX...",
+        ".....XXXX.....",
+        "....XX..XX....",
+        "...XX....XX..."
+    )
+
+    private val MASK_STAR = arrayOf(
+        "......XX......",
+        ".....XXXX.....",
+        "XXXX.XXXX.XXXX",
+        ".XXXXXXXXXXXX.",
+        "...XXXXXXXX...",
+        "....XXXXXX....",
+        "...XXXXXXXX...",
+        "..XXXX..XXXX..",
+        ".XXX......XXX.",
+        "XX..........XX"
+    )
+
+    private val MASK_CIRCLE = arrayOf(
+        "....XXXXXX....",
+        "..XXXXXXXXXX..",
+        ".XXXXXXXXXXXX.",
+        ".XXXXXXXXXXXX.",
+        "XXXXXXXXXXXXXX",
+        "XXXXXXXXXXXXXX",
+        ".XXXXXXXXXXXX.",
+        ".XXXXXXXXXXXX.",
+        "..XXXXXXXXXX.."
+    )
+
+    private val MASK_SQUARE = arrayOf(
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX",
+        "XXXXXXXXXXXXX"
+    )
+
     fun difficultyForLevel(level: Int): String {
         val safeLevel = maxOf(1, level)
         return when {
@@ -25,24 +103,42 @@ object PuzzleGenerator {
         }
     }
 
-    /** Returns recognizable shape/letter/bud pattern names for each level tier. */
+    /** Maps the level number to a specific shape theme phrase. */
     fun shapeThemeForLevel(level: Int): String {
         val safeLevel = maxOf(1, level)
-        return when ((safeLevel - 1) % 12) {
-            0 -> "Heart ♥"
-            1 -> "Flower Bud ✿"
-            2 -> "Letter 'E'"
-            3 -> "Letter 'X'"
-            4 -> "Letter 'I'"
-            5 -> "Letter 'T'"
-            6 -> "Star ★"
-            7 -> "Letter 'A'"
-            8 -> "Letter 'R'"
-            9 -> "Letter 'O'"
-            10 -> "Letter 'W'"
-            11 -> "Diamond ◆"
-            else -> "Heart ♥"
+        return when ((safeLevel - 1) % 6) {
+            0 -> "Heart Shaped Arrow Level ♥"
+            1 -> "Dog Shaped Arrow Level 🐕"
+            2 -> "Star Shaped Arrow Level ★"
+            3 -> "Circle Shaped Arrow Level ●"
+            4 -> "Bird Shaped Arrow Level 🐦"
+            else -> "Square Block Level ⬛"
         }
+    }
+
+    /** Returns the corresponding 2D grid mask stencil for the level. */
+    private fun getMaskForLevel(level: Int): Array<String> {
+        val safeLevel = maxOf(1, level)
+        return when ((safeLevel - 1) % 6) {
+            0 -> MASK_HEART
+            1 -> MASK_DOG
+            2 -> MASK_STAR
+            3 -> MASK_CIRCLE
+            4 -> MASK_BIRD
+            else -> MASK_SQUARE
+        }
+    }
+
+    /** Checks whether a cell is part of the stencil shape mask for the given grid dimensions. */
+    private fun isCellPlayable(r: Int, c: Int, rows: Int, cols: Int, level: Int): Boolean {
+        val mask = getMaskForLevel(level)
+        val maskRows = mask.size
+        val maskCols = mask[0].length
+
+        val mappedR = (r * maskRows / rows).coerceIn(0, maskRows - 1)
+        val mappedC = (c * maskCols / cols).coerceIn(0, maskCols - 1)
+
+        return mask[mappedR][mappedC] == 'X'
     }
 
     /** Strict monotonic arrow count calculation: Level 1 = 10, Level 2 = 22 (+12), Level 3 = 34 (+12)... */
@@ -53,7 +149,7 @@ object PuzzleGenerator {
 
     /** Calculates required grid size to ensure full capacity for the target arrow count. */
     fun calculateRequiredGridSize(targetArrows: Int): Int {
-        val requiredCells = (targetArrows * 1.15f).toInt()
+        val requiredCells = (targetArrows * 1.2f).toInt()
         val calculatedSize = kotlin.math.ceil(kotlin.math.sqrt(requiredCells.toDouble())).toInt()
         return maxOf(6, calculatedSize)
     }
@@ -64,6 +160,9 @@ object PuzzleGenerator {
         val neededGridSize = calculateRequiredGridSize(targetArrowCount)
         val size = maxOf(neededGridSize, maxGridCap.coerceAtLeast(6))
 
+        val rows = size
+        val cols = size
+
         val random = Random(safeLevel.toLong() * 7919L + 37L)
         val difficulty = difficultyForLevel(safeLevel)
         val shapeTheme = shapeThemeForLevel(safeLevel)
@@ -73,7 +172,7 @@ object PuzzleGenerator {
 
         for (_attempt in 0 until maxAttempts) {
             val generatedArrows = mutableListOf<Arrow>()
-            val occupied = Array(size) { BooleanArray(size) }
+            val occupied = Array(rows) { BooleanArray(cols) }
 
             var arrowId = 1
             var failCounter = 0
@@ -81,12 +180,12 @@ object PuzzleGenerator {
             while (generatedArrows.size < targetArrowCount && failCounter < 100) {
                 failCounter++
 
-                // Find candidate head positions (hr, hc) and exit directions
+                // Find candidate head positions (hr, hc) inside shape ('X') with clear exit directions
                 val candidateHeads = mutableListOf<Triple<Int, Int, Direction>>()
 
-                for (r in 0 until size) {
-                    for (c in 0 until size) {
-                        if (occupied[r][c]) continue
+                for (r in 0 until rows) {
+                    for (c in 0 until cols) {
+                        if (!isCellPlayable(r, c, rows, cols, safeLevel) || occupied[r][c]) continue
 
                         for (dir in ALL_DIRECTIONS) {
                             val (behindR, behindC) = when (dir) {
@@ -96,14 +195,14 @@ object PuzzleGenerator {
                                 Direction.DOWN -> Pair(r - 1, c)
                             }
 
-                            val hasBehind = behindR in 0 until size && behindC in 0 until size && !occupied[behindR][behindC]
+                            val hasBehind = behindR in 0 until rows && behindC in 0 until cols &&
+                                    isCellPlayable(behindR, behindC, rows, cols, safeLevel) && !occupied[behindR][behindC]
 
-                            // Allow 1-cell or multi-cell arrows on higher levels (level >= 15) for max arrow density
                             if (!hasBehind && safeLevel < 15) {
                                 continue
                             }
 
-                            // Check if exit ray in 'dir' to board edge is clear of already occupied cells
+                            // Exit ray can shoot over empty space ('.') to board edge
                             var rayR = r
                             var rayC = c
                             var clearRay = true
@@ -115,7 +214,7 @@ object PuzzleGenerator {
                                     Direction.UP -> rayR--
                                     Direction.DOWN -> rayR++
                                 }
-                                if (rayR !in 0 until size || rayC !in 0 until size) break
+                                if (rayR !in 0 until rows || rayC !in 0 until cols) break
                                 if (occupied[rayR][rayC]) {
                                     clearRay = false
                                     break
@@ -143,16 +242,15 @@ object PuzzleGenerator {
                     Direction.DOWN -> Pair(hr - 1, hc)
                 }
 
-                val hasBehindCell = behindR in 0 until size && behindC in 0 until size && !occupied[behindR][behindC]
+                val hasBehindCell = behindR in 0 until rows && behindC in 0 until cols &&
+                        isCellPlayable(behindR, behindC, rows, cols, safeLevel) && !occupied[behindR][behindC]
 
-                // Grow snaking body backwards from head
                 val snakingPath = mutableListOf<Pair<Int, Int>>()
                 snakingPath.add(Pair(hr, hc))
 
-                val tempOccupied = Array(size) { occupied[it].clone() }
+                val tempOccupied = Array(rows) { occupied[it].clone() }
                 tempOccupied[hr][hc] = true
 
-                // Also mark exit ray in front of head as forbidden so tail doesn't wrap in front of head
                 var forbidR = hr
                 var forbidC = hc
                 while (true) {
@@ -162,12 +260,11 @@ object PuzzleGenerator {
                         Direction.UP -> forbidR--
                         Direction.DOWN -> forbidR++
                     }
-                    if (forbidR !in 0 until size || forbidC !in 0 until size) break
+                    if (forbidR !in 0 until rows || forbidC !in 0 until cols) break
                     tempOccupied[forbidR][forbidC] = true
                 }
 
                 if (hasBehindCell && (safeLevel < 15 || random.nextBoolean())) {
-                    // Step 1: Force body cell behind head so line segment entering head matches direction
                     snakingPath.add(0, Pair(behindR, behindC))
                     tempOccupied[behindR][behindC] = true
 
@@ -183,7 +280,8 @@ object PuzzleGenerator {
                         for (i in 0..3) {
                             val nr = currR + dr[i]
                             val nc = currC + dc[i]
-                            if (nr in 0 until size && nc in 0 until size && !tempOccupied[nr][nc]) {
+                            if (nr in 0 until rows && nc in 0 until cols &&
+                                isCellPlayable(nr, nc, rows, cols, safeLevel) && !tempOccupied[nr][nc]) {
                                 neighbors.add(Pair(nr, nc))
                             }
                         }
@@ -193,18 +291,15 @@ object PuzzleGenerator {
                         val nextCell = neighbors[random.nextInt(neighbors.size)]
                         currR = nextCell.first
                         currC = nextCell.second
-                        snakingPath.add(0, Pair(currR, currC)) // Append to tail (front of list)
+                        snakingPath.add(0, Pair(currR, currC))
                         tempOccupied[currR][currC] = true
                     }
                 }
 
-                if (snakingPath.size >= 2) {
+                if (snakingPath.size >= 1) {
                     snakingPath.forEach { (pr, pc) -> occupied[pr][pc] = true }
 
-                    val color = GameTheme.ARROW_COLORS[
-                        generatedArrows.size % GameTheme.ARROW_COLORS.size
-                    ]
-
+                    val color = GameTheme.ARROW_COLORS[generatedArrows.size % GameTheme.ARROW_COLORS.size]
                     generatedArrows.add(
                         Arrow(
                             id = arrowId++,
@@ -217,13 +312,12 @@ object PuzzleGenerator {
             }
 
             if (generatedArrows.size >= 4) {
-                // Reverse generated list so the last placed arrow (which has a clear exit) is played first
                 generatedArrows.reverse()
 
                 val testPuzzle = Puzzle(
                     title = "Level $safeLevel · $shapeTheme",
-                    rows = size,
-                    cols = size,
+                    rows = rows,
+                    cols = cols,
                     arrows = generatedArrows,
                     level = safeLevel,
                     difficulty = difficulty,
@@ -237,14 +331,14 @@ object PuzzleGenerator {
             }
         }
 
-        // Fallback simple arrows filling remaining capacity if complex generation exceeded attempts
+        // Fallback: Fill remaining stencil shape ('X') cells with valid 1-cell or 2-cell arrows
         if (arrows == null) {
             val fallbackArrows = mutableListOf<Arrow>()
-            val occupied = Array(size) { BooleanArray(size) }
+            val occupied = Array(rows) { BooleanArray(cols) }
             var id = 1
-            for (r in 0 until size) {
-                for (c in 0 until size) {
-                    if (occupied[r][c]) continue
+            for (r in 0 until rows) {
+                for (c in 0 until cols) {
+                    if (occupied[r][c] || !isCellPlayable(r, c, rows, cols, safeLevel)) continue
                     var placed = false
                     for (dir in ALL_DIRECTIONS) {
                         val (br, bc) = when (dir) {
@@ -253,7 +347,7 @@ object PuzzleGenerator {
                             Direction.UP -> Pair(r + 1, c)
                             Direction.DOWN -> Pair(r - 1, c)
                         }
-                        if (br in 0 until size && bc in 0 until size && !occupied[br][bc]) {
+                        if (br in 0 until rows && bc in 0 until cols && isCellPlayable(br, bc, rows, cols, safeLevel) && !occupied[br][bc]) {
                             val path = listOf(Pair(br, bc), Pair(r, c))
                             path.forEach { (pr, pc) -> occupied[pr][pc] = true }
                             fallbackArrows.add(
@@ -285,16 +379,14 @@ object PuzzleGenerator {
             arrows = fallbackArrows
         }
 
-        val puzzle = Puzzle(
+        return Puzzle(
             title = "Level $safeLevel · $shapeTheme",
-            rows = size,
-            cols = size,
+            rows = rows,
+            cols = cols,
             arrows = arrows,
             level = safeLevel,
             difficulty = difficulty,
             seed = safeLevel.toLong()
         )
-
-        return puzzle
     }
 }

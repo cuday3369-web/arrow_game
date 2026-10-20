@@ -169,6 +169,7 @@ class CandyCrushLevelMapView(
             paint.textAlign = Paint.Align.CENTER
 
             val diffName = PuzzleGenerator.difficultyForLevel(i)
+            val shapeTheme = PuzzleGenerator.shapeThemeForLevel(i)
 
             if (isUnlocked) {
                 paint.textSize = 20f * density
@@ -177,23 +178,29 @@ class CandyCrushLevelMapView(
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
                 canvas.drawText("$i", x, textY, paint)
 
-                // Draw BOLD difficulty tier name & star rating below node
+                // Row 1: BOLD difficulty tier name
                 paint.textSize = 12f * density
-                paint.isFakeBoldText = true // BOLD for difficulty names
+                paint.isFakeBoldText = true
                 paint.color = if (i % 5 == 0) GameTheme.RED else GameTheme.CYAN
                 canvas.drawText(diffName, x, y + nodeRadius + 16f * density, paint)
 
-                // Only show earned stars (hide unearned stars)
+                // Row 2: BOLD Shape Theme name (e.g. "Heart Shaped Arrow Level ♥")
+                paint.textSize = 9.5f * density // Adjusted font size to fit long shape phrases
+                paint.isFakeBoldText = true
+                paint.color = GameTheme.GOLD
+                canvas.drawText(shapeTheme, x, y + nodeRadius + 28f * density, paint)
+
+                // Row 3: Only show earned stars (hide unearned stars)
                 val starStr = when (stars) {
                     3 -> "★★★"
                     2 -> "★★"
                     1 -> "★"
-                    else -> "" // Hide completely if 0 stars
+                    else -> ""
                 }
                 if (starStr.isNotEmpty()) {
-                    paint.textSize = 12f * density
+                    paint.textSize = 11f * density
                     paint.color = GameTheme.GOLD
-                    canvas.drawText(starStr, x, y + nodeRadius + 30f * density, paint)
+                    canvas.drawText(starStr, x, y + nodeRadius + 40f * density, paint)
                 }
             } else {
                 paint.textSize = 16f * density
@@ -201,16 +208,21 @@ class CandyCrushLevelMapView(
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
                 canvas.drawText("🔒", x, textY, paint)
 
-                // Draw BOLD difficulty tier name & "LOCKED" label below locked node
+                // Draw BOLD difficulty tier name & Shape Theme & "LOCKED" label below locked node
                 paint.textSize = 11f * density
-                paint.isFakeBoldText = true // BOLD for difficulty names
+                paint.isFakeBoldText = true
                 paint.color = Color.rgb(130, 148, 180)
                 canvas.drawText(diffName, x, y + nodeRadius + 15f * density, paint)
 
-                paint.textSize = 9f * density
+                paint.textSize = 8.5f * density // Adjusted font size to fit long shape phrases
+                paint.isFakeBoldText = true
+                paint.color = Color.rgb(160, 175, 205)
+                canvas.drawText(shapeTheme, x, y + nodeRadius + 26f * density, paint)
+
+                paint.textSize = 8f * density
                 paint.isFakeBoldText = true
                 paint.color = Color.rgb(90, 105, 135)
-                canvas.drawText("LOCKED", x, y + nodeRadius + 28f * density, paint)
+                canvas.drawText("LOCKED", x, y + nodeRadius + 37f * density, paint)
             }
         }
     }

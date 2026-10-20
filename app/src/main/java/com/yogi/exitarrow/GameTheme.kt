@@ -28,6 +28,11 @@ object GameTheme {
         rgb(255, 115, 160)
     )
 
+    fun isNightMode(context: Context): Boolean {
+        val uiMode = context.resources.configuration.uiMode
+        return (uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+    }
+
     fun dp(context: Context, value: Int): Int =
         (value * context.resources.displayMetrics.density).toInt()
 
