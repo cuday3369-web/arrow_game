@@ -20,6 +20,9 @@ import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.BounceInterpolator
 import android.view.animation.OvershootInterpolator
 import android.widget.TextView
+import androidx.dynamicanimation.animation.DynamicAnimation
+import androidx.dynamicanimation.animation.SpringAnimation
+import androidx.dynamicanimation.animation.SpringForce
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
@@ -121,6 +124,28 @@ object GameEffects {
             interpolator = AccelerateDecelerateInterpolator()
             start()
         }
+    }
+
+    /** Real-world physics spring bounce using DynamicAnimation physics engine. */
+    fun physicsSpringBounce(
+        view: View,
+        stiffness: Float = SpringForce.STIFFNESS_MEDIUM,
+        dampingRatio: Float = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+    ) {
+        view.scaleX = 0.5f
+        view.scaleY = 0.5f
+
+        val springX = SpringAnimation(view, DynamicAnimation.SCALE_X, 1.0f).apply {
+            spring.stiffness = stiffness
+            spring.dampingRatio = dampingRatio
+        }
+        val springY = SpringAnimation(view, DynamicAnimation.SCALE_Y, 1.0f).apply {
+            spring.stiffness = stiffness
+            spring.dampingRatio = dampingRatio
+        }
+
+        springX.start()
+        springY.start()
     }
 
     /** Bouncy physics inertial scale animation for badges, stars, and pop-ups with optional delay. */

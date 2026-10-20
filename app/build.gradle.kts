@@ -28,6 +28,10 @@ android {
 
 dependencies {
     implementation(libs.androidx.constraintlayout)
+    implementation(libs.androidx.dynamicanimation)
+    implementation(libs.androidx.graphics.shapes)
+    implementation(libs.androidx.graphics.core)
+    implementation(libs.androidx.palette)
     implementation(libs.lottie)
     testImplementation("junit:junit:4.13.2")
 }
