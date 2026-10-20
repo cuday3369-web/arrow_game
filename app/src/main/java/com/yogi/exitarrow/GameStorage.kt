@@ -10,8 +10,8 @@ class GameStorage(context: Context) {
     )
 
     fun loadProgress() = GameProgress(
-        unlockedLevel = prefs.getInt("unlocked_level", 1).coerceAtLeast(1),
-        totalStars = prefs.getInt("total_stars", 0).coerceAtLeast(0),
+        unlockedLevel = prefs.getInt("unlocked_level", 100).coerceAtLeast(100),
+        totalStars = prefs.getInt("total_stars", 300).coerceAtLeast(0),
         soundEnabled = prefs.getBoolean("sound_enabled", true),
         vibrationEnabled = prefs.getBoolean("vibration_enabled", true),
         reducedMotion = prefs.getBoolean("reduced_motion", false)

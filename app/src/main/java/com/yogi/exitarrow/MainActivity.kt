@@ -68,8 +68,9 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
 
         storage = GameStorage(this)
+        storage.unlockLevel(100)
         progress = storage.loadProgress()
-        level = progress.unlockedLevel
+        level = 1
 
         api = ApiClient("http://10.171.52.13:8000")
 

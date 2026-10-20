@@ -25,6 +25,26 @@ object PuzzleGenerator {
         }
     }
 
+    /** Returns recognizable shape/letter/bud pattern names for each level tier. */
+    fun shapeThemeForLevel(level: Int): String {
+        val safeLevel = maxOf(1, level)
+        return when ((safeLevel - 1) % 12) {
+            0 -> "Heart ♥"
+            1 -> "Flower Bud ✿"
+            2 -> "Letter 'E'"
+            3 -> "Letter 'X'"
+            4 -> "Letter 'I'"
+            5 -> "Letter 'T'"
+            6 -> "Star ★"
+            7 -> "Letter 'A'"
+            8 -> "Letter 'R'"
+            9 -> "Letter 'O'"
+            10 -> "Letter 'W'"
+            11 -> "Diamond ◆"
+            else -> "Heart ♥"
+        }
+    }
+
     /** Strict monotonic arrow count calculation: Level 1 = 10, Level 2 = 22 (+12), Level 3 = 34 (+12)... */
     fun targetArrowCountForLevel(level: Int): Int {
         val safeLevel = maxOf(1, level)
@@ -46,6 +66,7 @@ object PuzzleGenerator {
 
         val random = Random(safeLevel.toLong() * 7919L + 37L)
         val difficulty = difficultyForLevel(safeLevel)
+        val shapeTheme = shapeThemeForLevel(safeLevel)
 
         var arrows: MutableList<Arrow>? = null
         val maxAttempts = 150
@@ -200,7 +221,7 @@ object PuzzleGenerator {
                 generatedArrows.reverse()
 
                 val testPuzzle = Puzzle(
-                    title = "Level $safeLevel",
+                    title = "Level $safeLevel · $shapeTheme",
                     rows = size,
                     cols = size,
                     arrows = generatedArrows,
@@ -265,7 +286,7 @@ object PuzzleGenerator {
         }
 
         val puzzle = Puzzle(
-            title = "Level $safeLevel",
+            title = "Level $safeLevel · $shapeTheme",
             rows = size,
             cols = size,
             arrows = arrows,
