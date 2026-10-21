@@ -30,6 +30,11 @@ class CandyCrushLevelMapView(
     private val nodePositions = mutableListOf<Pair<Float, Float>>()
     private val clipRect = Rect()
 
+    private var tappedNodeIndex = -1
+    private var tappedNodeScale = 1.0f
+    private var lockedShakeIndex = -1
+    private var lockedShakeOffset = 0f
+
     init {
         isClickable = true
     }
@@ -121,7 +126,7 @@ class CandyCrushLevelMapView(
         // Draw circular 3D level nodes (only visible ones)
         for (i in 1..totalLevels) {
             val pos = nodePositions[i - 1]
-            val x = pos.first
+            val origX = pos.first
             val y = pos.second
 
             if (y !in visibleTop..visibleBottom) continue
@@ -130,10 +135,15 @@ class CandyCrushLevelMapView(
             val isCurrent = i == currentLevel
             val stars = if (isUnlocked) getBestStars(i) else 0
 
+            val scale = if (i == tappedNodeIndex) tappedNodeScale else 1f
+            val shakeX = if (i == lockedShakeIndex) lockedShakeOffset else 0f
+            val x = origX + shakeX
+            val radius = nodeRadius * scale
+
             // 1. Draw 3D Under-Shadow for depth elevation
             paint.style = Paint.Style.FILL
             paint.color = Color.argb(160, 2, 8, 18)
-            canvas.drawCircle(x, y + 5f * density, nodeRadius, paint)
+            canvas.drawCircle(x, y + 5f * density, radius, paint)
 
             // 2. Draw current level glowing aura ring
             if (isCurrent) {
@@ -141,7 +151,7 @@ class CandyCrushLevelMapView(
                 paint.strokeWidth = 5f * density
                 paint.color = GameTheme.GOLD
                 val pulse = 1f + 0.12f * sin(System.currentTimeMillis() / 150.0).toFloat()
-                canvas.drawCircle(x, y, nodeRadius * 1.35f * pulse, paint)
+                canvas.drawCircle(x, y, radius * 1.35f * pulse, paint)
                 postInvalidateOnAnimation()
             }
 
@@ -156,13 +166,13 @@ class CandyCrushLevelMapView(
                 }
                 else -> Color.rgb(20, 28, 44)
             }
-            canvas.drawCircle(x, y, nodeRadius, paint)
+            canvas.drawCircle(x, y, radius, paint)
 
             // 4. Draw 3D metallic/crystal border stroke
             paint.style = Paint.Style.STROKE
             paint.strokeWidth = 3.5f * density
             paint.color = if (isUnlocked) GameTheme.WHITE else Color.rgb(45, 58, 88)
-            canvas.drawCircle(x, y, nodeRadius, paint)
+            canvas.drawCircle(x, y, radius, paint)
 
             // Draw text/icon inside node
             paint.style = Paint.Style.FILL
@@ -172,7 +182,7 @@ class CandyCrushLevelMapView(
             val shapeTheme = PuzzleGenerator.shapeThemeForLevel(i)
 
             if (isUnlocked) {
-                paint.textSize = 20f * density
+                paint.textSize = 20f * density * scale
                 paint.color = if (isCurrent) GameTheme.BACKGROUND else GameTheme.WHITE
                 paint.isFakeBoldText = true
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
@@ -182,13 +192,13 @@ class CandyCrushLevelMapView(
                 paint.textSize = 12f * density
                 paint.isFakeBoldText = true
                 paint.color = if (i % 5 == 0) GameTheme.RED else GameTheme.CYAN
-                canvas.drawText(diffName, x, y + nodeRadius + 16f * density, paint)
+                canvas.drawText(diffName, x, y + radius + 16f * density, paint)
 
                 // Row 2: BOLD Shape Theme name (e.g. "Heart Shaped Arrow Level ♥")
                 paint.textSize = 9.5f * density // Adjusted font size to fit long shape phrases
                 paint.isFakeBoldText = true
                 paint.color = GameTheme.GOLD
-                canvas.drawText(shapeTheme, x, y + nodeRadius + 28f * density, paint)
+                canvas.drawText(shapeTheme, x, y + radius + 28f * density, paint)
 
                 // Row 3: Only show earned stars (hide unearned stars)
                 val starStr = when (stars) {
@@ -200,10 +210,10 @@ class CandyCrushLevelMapView(
                 if (starStr.isNotEmpty()) {
                     paint.textSize = 11f * density
                     paint.color = GameTheme.GOLD
-                    canvas.drawText(starStr, x, y + nodeRadius + 40f * density, paint)
+                    canvas.drawText(starStr, x, y + radius + 40f * density, paint)
                 }
             } else {
-                paint.textSize = 16f * density
+                paint.textSize = 16f * density * scale
                 paint.color = GameTheme.MUTED
                 val textY = y - (paint.descent() + paint.ascent()) / 2f
                 canvas.drawText("🔒", x, textY, paint)
@@ -212,17 +222,17 @@ class CandyCrushLevelMapView(
                 paint.textSize = 11f * density
                 paint.isFakeBoldText = true
                 paint.color = Color.rgb(130, 148, 180)
-                canvas.drawText(diffName, x, y + nodeRadius + 15f * density, paint)
+                canvas.drawText(diffName, x, y + radius + 15f * density, paint)
 
                 paint.textSize = 8.5f * density // Adjusted font size to fit long shape phrases
                 paint.isFakeBoldText = true
                 paint.color = Color.rgb(160, 175, 205)
-                canvas.drawText(shapeTheme, x, y + nodeRadius + 26f * density, paint)
+                canvas.drawText(shapeTheme, x, y + radius + 26f * density, paint)
 
                 paint.textSize = 8f * density
                 paint.isFakeBoldText = true
                 paint.color = Color.rgb(90, 105, 135)
-                canvas.drawText("LOCKED", x, y + nodeRadius + 37f * density, paint)
+                canvas.drawText("LOCKED", x, y + radius + 37f * density, paint)
             }
         }
     }
@@ -243,15 +253,59 @@ class CandyCrushLevelMapView(
             if (distSq <= (nodeRadius * 1.5f) * (nodeRadius * 1.5f)) {
                 performClick()
                 if (i <= unlockedLevel) {
-                    onLevelSelected(i)
+                    animateNodeBounce(i) {
+                        onLevelSelected(i)
+                    }
                 } else {
-                    onLockedLevelTapped?.invoke(i)
+                    animateLockedShake(i) {
+                        onLockedLevelTapped?.invoke(i)
+                    }
                 }
                 return true
             }
         }
         performClick()
         return true
+    }
+
+    private fun animateNodeBounce(levelIndex: Int, onComplete: () -> Unit) {
+        tappedNodeIndex = levelIndex
+        android.animation.ValueAnimator.ofFloat(1.0f, 1.35f, 1.0f).apply {
+            duration = 240L
+            interpolator = android.view.animation.OvershootInterpolator(2.5f)
+            addUpdateListener { anim ->
+                tappedNodeScale = anim.animatedValue as Float
+                postInvalidateOnAnimation()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    tappedNodeIndex = -1
+                    tappedNodeScale = 1.0f
+                    onComplete()
+                }
+            })
+            start()
+        }
+    }
+
+    private fun animateLockedShake(levelIndex: Int, onComplete: () -> Unit) {
+        lockedShakeIndex = levelIndex
+        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 320L
+            addUpdateListener { anim ->
+                val p = anim.animatedValue as Float
+                lockedShakeOffset = (sin(p * Math.PI * 6) * (1f - p) * 10f * density).toFloat()
+                postInvalidateOnAnimation()
+            }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    lockedShakeIndex = -1
+                    lockedShakeOffset = 0f
+                    onComplete()
+                }
+            })
+            start()
+        }
     }
 
     override fun performClick(): Boolean {

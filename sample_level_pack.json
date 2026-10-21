@@ -1,0 +1,2109 @@
+{
+  "pack_version": "1.0",
+  "total_levels": 5,
+  "levels": [
+    {
+      "level": 1,
+      "title": "Level 1 \u00b7 Neon Circuit",
+      "difficulty": "Beginner",
+      "theme": "Neon Circuit",
+      "rows": 8,
+      "cols": 8,
+      "total_arrows": 12,
+      "arrows": [
+        {
+          "id": 12,
+          "path": [
+            {
+              "row": 4,
+              "col": 6
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 11,
+          "path": [
+            {
+              "row": 0,
+              "col": 2
+            },
+            {
+              "row": 0,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 10,
+          "path": [
+            {
+              "row": 4,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 9,
+          "path": [
+            {
+              "row": 5,
+              "col": 4
+            },
+            {
+              "row": 5,
+              "col": 5
+            },
+            {
+              "row": 6,
+              "col": 5
+            },
+            {
+              "row": 7,
+              "col": 5
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 8,
+          "path": [
+            {
+              "row": 4,
+              "col": 3
+            },
+            {
+              "row": 3,
+              "col": 3
+            },
+            {
+              "row": 3,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 7,
+          "path": [
+            {
+              "row": 0,
+              "col": 6
+            },
+            {
+              "row": 0,
+              "col": 5
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 6,
+          "path": [
+            {
+              "row": 5,
+              "col": 3
+            },
+            {
+              "row": 6,
+              "col": 3
+            },
+            {
+              "row": 6,
+              "col": 4
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 5,
+          "path": [
+            {
+              "row": 0,
+              "col": 7
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 4,
+          "path": [
+            {
+              "row": 7,
+              "col": 0
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 3,
+          "path": [
+            {
+              "row": 2,
+              "col": 3
+            },
+            {
+              "row": 2,
+              "col": 2
+            },
+            {
+              "row": 1,
+              "col": 2
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 2,
+          "path": [
+            {
+              "row": 3,
+              "col": 6
+            },
+            {
+              "row": 2,
+              "col": 6
+            },
+            {
+              "row": 2,
+              "col": 7
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 1,
+          "path": [
+            {
+              "row": 1,
+              "col": 4
+            },
+            {
+              "row": 1,
+              "col": 5
+            },
+            {
+              "row": 1,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#42E8FF",
+          "active": true
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "title": "Level 2 \u00b7 Quantum Mesh",
+      "difficulty": "Beginner",
+      "theme": "Quantum Mesh",
+      "rows": 8,
+      "cols": 8,
+      "total_arrows": 18,
+      "arrows": [
+        {
+          "id": 18,
+          "path": [
+            {
+              "row": 5,
+              "col": 1
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 17,
+          "path": [
+            {
+              "row": 5,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 16,
+          "path": [
+            {
+              "row": 1,
+              "col": 5
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 15,
+          "path": [
+            {
+              "row": 4,
+              "col": 6
+            },
+            {
+              "row": 4,
+              "col": 5
+            },
+            {
+              "row": 3,
+              "col": 5
+            },
+            {
+              "row": 3,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 14,
+          "path": [
+            {
+              "row": 2,
+              "col": 4
+            },
+            {
+              "row": 1,
+              "col": 4
+            },
+            {
+              "row": 0,
+              "col": 4
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 13,
+          "path": [
+            {
+              "row": 4,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 12,
+          "path": [
+            {
+              "row": 3,
+              "col": 0
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 11,
+          "path": [
+            {
+              "row": 2,
+              "col": 2
+            },
+            {
+              "row": 2,
+              "col": 1
+            },
+            {
+              "row": 2,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 10,
+          "path": [
+            {
+              "row": 6,
+              "col": 7
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 9,
+          "path": [
+            {
+              "row": 2,
+              "col": 7
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 8,
+          "path": [
+            {
+              "row": 5,
+              "col": 5
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 7,
+          "path": [
+            {
+              "row": 5,
+              "col": 4
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 6,
+          "path": [
+            {
+              "row": 0,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 0
+            },
+            {
+              "row": 1,
+              "col": 0
+            },
+            {
+              "row": 1,
+              "col": 1
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 5,
+          "path": [
+            {
+              "row": 6,
+              "col": 6
+            },
+            {
+              "row": 6,
+              "col": 5
+            },
+            {
+              "row": 7,
+              "col": 5
+            },
+            {
+              "row": 7,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 4,
+          "path": [
+            {
+              "row": 3,
+              "col": 1
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 3,
+          "path": [
+            {
+              "row": 4,
+              "col": 1
+            },
+            {
+              "row": 4,
+              "col": 2
+            },
+            {
+              "row": 3,
+              "col": 2
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 2,
+          "path": [
+            {
+              "row": 6,
+              "col": 4
+            },
+            {
+              "row": 7,
+              "col": 4
+            },
+            {
+              "row": 7,
+              "col": 3
+            },
+            {
+              "row": 7,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 1,
+          "path": [
+            {
+              "row": 6,
+              "col": 3
+            },
+            {
+              "row": 5,
+              "col": 3
+            },
+            {
+              "row": 4,
+              "col": 3
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "title": "Level 3 \u00b7 Cyber Lattice",
+      "difficulty": "Beginner",
+      "theme": "Cyber Lattice",
+      "rows": 8,
+      "cols": 8,
+      "total_arrows": 24,
+      "arrows": [
+        {
+          "id": 24,
+          "path": [
+            {
+              "row": 4,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 23,
+          "path": [
+            {
+              "row": 7,
+              "col": 5
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 22,
+          "path": [
+            {
+              "row": 4,
+              "col": 2
+            },
+            {
+              "row": 5,
+              "col": 2
+            },
+            {
+              "row": 5,
+              "col": 1
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 21,
+          "path": [
+            {
+              "row": 0,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 20,
+          "path": [
+            {
+              "row": 0,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 19,
+          "path": [
+            {
+              "row": 1,
+              "col": 2
+            },
+            {
+              "row": 1,
+              "col": 3
+            },
+            {
+              "row": 0,
+              "col": 3
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 18,
+          "path": [
+            {
+              "row": 0,
+              "col": 4
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 17,
+          "path": [
+            {
+              "row": 5,
+              "col": 3
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 16,
+          "path": [
+            {
+              "row": 5,
+              "col": 4
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 15,
+          "path": [
+            {
+              "row": 2,
+              "col": 1
+            },
+            {
+              "row": 2,
+              "col": 0
+            },
+            {
+              "row": 1,
+              "col": 0
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 14,
+          "path": [
+            {
+              "row": 0,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 13,
+          "path": [
+            {
+              "row": 2,
+              "col": 5
+            },
+            {
+              "row": 2,
+              "col": 6
+            },
+            {
+              "row": 2,
+              "col": 7
+            },
+            {
+              "row": 1,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 12,
+          "path": [
+            {
+              "row": 4,
+              "col": 1
+            },
+            {
+              "row": 3,
+              "col": 1
+            },
+            {
+              "row": 3,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 11,
+          "path": [
+            {
+              "row": 7,
+              "col": 7
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 10,
+          "path": [
+            {
+              "row": 7,
+              "col": 2
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 9,
+          "path": [
+            {
+              "row": 0,
+              "col": 5
+            },
+            {
+              "row": 1,
+              "col": 5
+            },
+            {
+              "row": 1,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 8,
+          "path": [
+            {
+              "row": 4,
+              "col": 7
+            },
+            {
+              "row": 3,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 7,
+          "path": [
+            {
+              "row": 1,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 2
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 6,
+          "path": [
+            {
+              "row": 4,
+              "col": 6
+            },
+            {
+              "row": 5,
+              "col": 6
+            },
+            {
+              "row": 5,
+              "col": 5
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 5,
+          "path": [
+            {
+              "row": 6,
+              "col": 5
+            },
+            {
+              "row": 6,
+              "col": 6
+            },
+            {
+              "row": 6,
+              "col": 7
+            },
+            {
+              "row": 5,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 4,
+          "path": [
+            {
+              "row": 1,
+              "col": 4
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 3,
+          "path": [
+            {
+              "row": 6,
+              "col": 0
+            },
+            {
+              "row": 7,
+              "col": 0
+            },
+            {
+              "row": 7,
+              "col": 1
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 2,
+          "path": [
+            {
+              "row": 6,
+              "col": 2
+            },
+            {
+              "row": 6,
+              "col": 3
+            },
+            {
+              "row": 6,
+              "col": 4
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 1,
+          "path": [
+            {
+              "row": 2,
+              "col": 4
+            },
+            {
+              "row": 2,
+              "col": 3
+            },
+            {
+              "row": 2,
+              "col": 2
+            },
+            {
+              "row": 3,
+              "col": 2
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#42E8FF",
+          "active": true
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "title": "Level 4 \u00b7 Cosmic Maze",
+      "difficulty": "Easy",
+      "theme": "Cosmic Maze",
+      "rows": 10,
+      "cols": 10,
+      "total_arrows": 32,
+      "arrows": [
+        {
+          "id": 32,
+          "path": [
+            {
+              "row": 6,
+              "col": 7
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 31,
+          "path": [
+            {
+              "row": 9,
+              "col": 6
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 30,
+          "path": [
+            {
+              "row": 5,
+              "col": 8
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 29,
+          "path": [
+            {
+              "row": 6,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 28,
+          "path": [
+            {
+              "row": 0,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 27,
+          "path": [
+            {
+              "row": 2,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 26,
+          "path": [
+            {
+              "row": 3,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 25,
+          "path": [
+            {
+              "row": 1,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 24,
+          "path": [
+            {
+              "row": 1,
+              "col": 7
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 23,
+          "path": [
+            {
+              "row": 0,
+              "col": 6
+            }
+          ],
+          "direction": "UP",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 22,
+          "path": [
+            {
+              "row": 2,
+              "col": 5
+            },
+            {
+              "row": 1,
+              "col": 5
+            },
+            {
+              "row": 0,
+              "col": 5
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 21,
+          "path": [
+            {
+              "row": 2,
+              "col": 3
+            },
+            {
+              "row": 2,
+              "col": 2
+            },
+            {
+              "row": 2,
+              "col": 1
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 20,
+          "path": [
+            {
+              "row": 6,
+              "col": 8
+            },
+            {
+              "row": 7,
+              "col": 8
+            },
+            {
+              "row": 7,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 19,
+          "path": [
+            {
+              "row": 9,
+              "col": 9
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 18,
+          "path": [
+            {
+              "row": 5,
+              "col": 6
+            },
+            {
+              "row": 5,
+              "col": 5
+            },
+            {
+              "row": 6,
+              "col": 5
+            },
+            {
+              "row": 6,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 17,
+          "path": [
+            {
+              "row": 8,
+              "col": 9
+            },
+            {
+              "row": 8,
+              "col": 8
+            },
+            {
+              "row": 9,
+              "col": 8
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 16,
+          "path": [
+            {
+              "row": 6,
+              "col": 4
+            },
+            {
+              "row": 6,
+              "col": 3
+            },
+            {
+              "row": 7,
+              "col": 3
+            },
+            {
+              "row": 7,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 15,
+          "path": [
+            {
+              "row": 0,
+              "col": 9
+            },
+            {
+              "row": 0,
+              "col": 8
+            },
+            {
+              "row": 1,
+              "col": 8
+            },
+            {
+              "row": 1,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 14,
+          "path": [
+            {
+              "row": 7,
+              "col": 5
+            },
+            {
+              "row": 8,
+              "col": 5
+            },
+            {
+              "row": 8,
+              "col": 6
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 13,
+          "path": [
+            {
+              "row": 6,
+              "col": 1
+            },
+            {
+              "row": 5,
+              "col": 1
+            },
+            {
+              "row": 5,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 12,
+          "path": [
+            {
+              "row": 7,
+              "col": 4
+            },
+            {
+              "row": 8,
+              "col": 4
+            },
+            {
+              "row": 9,
+              "col": 4
+            },
+            {
+              "row": 9,
+              "col": 5
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 11,
+          "path": [
+            {
+              "row": 0,
+              "col": 2
+            },
+            {
+              "row": 0,
+              "col": 3
+            },
+            {
+              "row": 0,
+              "col": 4
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 10,
+          "path": [
+            {
+              "row": 9,
+              "col": 3
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 9,
+          "path": [
+            {
+              "row": 3,
+              "col": 6
+            },
+            {
+              "row": 3,
+              "col": 7
+            },
+            {
+              "row": 3,
+              "col": 8
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 8,
+          "path": [
+            {
+              "row": 3,
+              "col": 2
+            },
+            {
+              "row": 3,
+              "col": 3
+            },
+            {
+              "row": 4,
+              "col": 3
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 7,
+          "path": [
+            {
+              "row": 2,
+              "col": 8
+            },
+            {
+              "row": 2,
+              "col": 7
+            },
+            {
+              "row": 2,
+              "col": 6
+            },
+            {
+              "row": 1,
+              "col": 6
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 6,
+          "path": [
+            {
+              "row": 1,
+              "col": 2
+            },
+            {
+              "row": 1,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 5,
+          "path": [
+            {
+              "row": 4,
+              "col": 4
+            },
+            {
+              "row": 4,
+              "col": 5
+            },
+            {
+              "row": 3,
+              "col": 5
+            }
+          ],
+          "direction": "UP",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 4,
+          "path": [
+            {
+              "row": 3,
+              "col": 0
+            },
+            {
+              "row": 3,
+              "col": 1
+            },
+            {
+              "row": 4,
+              "col": 1
+            },
+            {
+              "row": 4,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 3,
+          "path": [
+            {
+              "row": 9,
+              "col": 2
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 2,
+          "path": [
+            {
+              "row": 8,
+              "col": 1
+            },
+            {
+              "row": 9,
+              "col": 1
+            },
+            {
+              "row": 9,
+              "col": 0
+            },
+            {
+              "row": 8,
+              "col": 0
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 1,
+          "path": [
+            {
+              "row": 5,
+              "col": 7
+            },
+            {
+              "row": 4,
+              "col": 7
+            },
+            {
+              "row": 4,
+              "col": 8
+            },
+            {
+              "row": 4,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#42E8FF",
+          "active": true
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "title": "Level 5 \u00b7 Plasma Matrix",
+      "difficulty": "Easy",
+      "theme": "Plasma Matrix",
+      "rows": 10,
+      "cols": 10,
+      "total_arrows": 28,
+      "arrows": [
+        {
+          "id": 28,
+          "path": [
+            {
+              "row": 9,
+              "col": 4
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 27,
+          "path": [
+            {
+              "row": 4,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 26,
+          "path": [
+            {
+              "row": 9,
+              "col": 5
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 25,
+          "path": [
+            {
+              "row": 4,
+              "col": 8
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 24,
+          "path": [
+            {
+              "row": 0,
+              "col": 4
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 23,
+          "path": [
+            {
+              "row": 3,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 22,
+          "path": [
+            {
+              "row": 0,
+              "col": 3
+            }
+          ],
+          "direction": "UP",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 21,
+          "path": [
+            {
+              "row": 1,
+              "col": 2
+            },
+            {
+              "row": 0,
+              "col": 2
+            }
+          ],
+          "direction": "UP",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 20,
+          "path": [
+            {
+              "row": 7,
+              "col": 4
+            },
+            {
+              "row": 7,
+              "col": 5
+            },
+            {
+              "row": 8,
+              "col": 5
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 19,
+          "path": [
+            {
+              "row": 8,
+              "col": 2
+            },
+            {
+              "row": 8,
+              "col": 1
+            },
+            {
+              "row": 9,
+              "col": 1
+            },
+            {
+              "row": 9,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 18,
+          "path": [
+            {
+              "row": 5,
+              "col": 0
+            },
+            {
+              "row": 5,
+              "col": 1
+            },
+            {
+              "row": 6,
+              "col": 1
+            },
+            {
+              "row": 6,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 17,
+          "path": [
+            {
+              "row": 2,
+              "col": 3
+            },
+            {
+              "row": 1,
+              "col": 3
+            }
+          ],
+          "direction": "UP",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 16,
+          "path": [
+            {
+              "row": 7,
+              "col": 3
+            },
+            {
+              "row": 7,
+              "col": 2
+            },
+            {
+              "row": 7,
+              "col": 1
+            },
+            {
+              "row": 7,
+              "col": 0
+            },
+            {
+              "row": 8,
+              "col": 0
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 15,
+          "path": [
+            {
+              "row": 1,
+              "col": 1
+            },
+            {
+              "row": 2,
+              "col": 1
+            },
+            {
+              "row": 3,
+              "col": 1
+            },
+            {
+              "row": 4,
+              "col": 1
+            },
+            {
+              "row": 4,
+              "col": 0
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 14,
+          "path": [
+            {
+              "row": 0,
+              "col": 5
+            }
+          ],
+          "direction": "UP",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 13,
+          "path": [
+            {
+              "row": 6,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 12,
+          "path": [
+            {
+              "row": 4,
+              "col": 7
+            },
+            {
+              "row": 3,
+              "col": 7
+            },
+            {
+              "row": 3,
+              "col": 8
+            },
+            {
+              "row": 2,
+              "col": 8
+            },
+            {
+              "row": 2,
+              "col": 9
+            }
+          ],
+          "direction": "RIGHT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 11,
+          "path": [
+            {
+              "row": 6,
+              "col": 4
+            },
+            {
+              "row": 5,
+              "col": 4
+            },
+            {
+              "row": 5,
+              "col": 5
+            },
+            {
+              "row": 6,
+              "col": 5
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 10,
+          "path": [
+            {
+              "row": 8,
+              "col": 4
+            },
+            {
+              "row": 8,
+              "col": 3
+            },
+            {
+              "row": 9,
+              "col": 3
+            },
+            {
+              "row": 9,
+              "col": 2
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 9,
+          "path": [
+            {
+              "row": 0,
+              "col": 1
+            },
+            {
+              "row": 0,
+              "col": 0
+            },
+            {
+              "row": 1,
+              "col": 0
+            },
+            {
+              "row": 2,
+              "col": 0
+            },
+            {
+              "row": 3,
+              "col": 0
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 8,
+          "path": [
+            {
+              "row": 1,
+              "col": 7
+            },
+            {
+              "row": 2,
+              "col": 7
+            },
+            {
+              "row": 2,
+              "col": 6
+            },
+            {
+              "row": 1,
+              "col": 6
+            },
+            {
+              "row": 1,
+              "col": 5
+            },
+            {
+              "row": 1,
+              "col": 4
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 7,
+          "path": [
+            {
+              "row": 2,
+              "col": 2
+            },
+            {
+              "row": 3,
+              "col": 2
+            },
+            {
+              "row": 4,
+              "col": 2
+            },
+            {
+              "row": 5,
+              "col": 2
+            },
+            {
+              "row": 5,
+              "col": 3
+            },
+            {
+              "row": 6,
+              "col": 3
+            }
+          ],
+          "direction": "DOWN",
+          "color": "#42E8FF",
+          "active": true
+        },
+        {
+          "id": 6,
+          "path": [
+            {
+              "row": 0,
+              "col": 6
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF5678",
+          "active": true
+        },
+        {
+          "id": 5,
+          "path": [
+            {
+              "row": 7,
+              "col": 8
+            },
+            {
+              "row": 7,
+              "col": 9
+            },
+            {
+              "row": 6,
+              "col": 9
+            },
+            {
+              "row": 5,
+              "col": 9
+            },
+            {
+              "row": 5,
+              "col": 8
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#9B6EFF",
+          "active": true
+        },
+        {
+          "id": 4,
+          "path": [
+            {
+              "row": 1,
+              "col": 9
+            },
+            {
+              "row": 0,
+              "col": 9
+            },
+            {
+              "row": 0,
+              "col": 8
+            },
+            {
+              "row": 0,
+              "col": 7
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#5FF0B1",
+          "active": true
+        },
+        {
+          "id": 3,
+          "path": [
+            {
+              "row": 3,
+              "col": 3
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FFCF5B",
+          "active": true
+        },
+        {
+          "id": 2,
+          "path": [
+            {
+              "row": 9,
+              "col": 6
+            },
+            {
+              "row": 9,
+              "col": 7
+            },
+            {
+              "row": 9,
+              "col": 8
+            },
+            {
+              "row": 9,
+              "col": 9
+            },
+            {
+              "row": 8,
+              "col": 9
+            },
+            {
+              "row": 8,
+              "col": 8
+            }
+          ],
+          "direction": "LEFT",
+          "color": "#FF73A0",
+          "active": true
+        },
+        {
+          "id": 1,
+          "path": [
+            {
+              "row": 2,
+              "col": 5
+            },
+            {
+              "row": 2,
+              "col": 4
+            },
+            {
+              "row": 3,
+              "col": 4
+            },
+            {
+              "row": 4,
+              "col": 4
+            },
+            {
+              "row": 4,
+              "col": 5
+            },
+            {
+              "row": 3,
+              "col": 5
+            }
+          ],
+          "direction": "UP",
+          "color": "#42E8FF",
+          "active": true
+        }
+      ]
+    }
+  ]
+}

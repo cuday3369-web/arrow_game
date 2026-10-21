@@ -37,6 +37,7 @@ class PuzzleBoardView(context: Context) : View(context) {
     private val exits = IdentityHashMap<Arrow, ValueAnimator>()
     private val shakes = IdentityHashMap<Arrow, ValueAnimator>()
     private val shakeOffsets = IdentityHashMap<Arrow, Float>()
+    private val squishScales = IdentityHashMap<Arrow, Float>()
     private var hintedArrow: Arrow? = null
 
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -120,6 +121,7 @@ class PuzzleBoardView(context: Context) : View(context) {
         exits.clear()
         shakes.clear()
         shakeOffsets.clear()
+        squishScales.clear()
         oldExits.forEach { it.cancel() }
         oldShakes.forEach { it.cancel() }
 
@@ -134,6 +136,7 @@ class PuzzleBoardView(context: Context) : View(context) {
 
         shakes.remove(arrow)?.cancel()
         shakeOffsets.remove(arrow)
+        squishScales.remove(arrow)
 
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = 1000L
@@ -175,17 +178,20 @@ class PuzzleBoardView(context: Context) : View(context) {
         shakes.remove(arrow)?.cancel()
 
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 320L
+            duration = 340L
             addUpdateListener {
                 val p = it.animatedValue as Float
                 shakeOffsets[arrow] =
-                    (sin(p * Math.PI * 6) * (1f - p) * 7f * density).toFloat()
+                    (sin(p * Math.PI * 6) * (1f - p) * 9f * density).toFloat()
+                squishScales[arrow] =
+                    1f - (sin(p * Math.PI * 3) * (1f - p) * 0.25f).toFloat()
                 postInvalidateOnAnimation()
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
                     if (shakes[arrow] === animation) shakes.remove(arrow)
                     shakeOffsets.remove(arrow)
+                    squishScales.remove(arrow)
                     invalidate()
                 }
             })
@@ -245,9 +251,10 @@ class PuzzleBoardView(context: Context) : View(context) {
 
             val hinted = arrow === hintedArrow
             val color = if (hinted) GameTheme.GOLD else arrow.color
+            val squish = squishScales[arrow] ?: 1f
             val pulse = if (hinted) {
-                1f + 0.10f * sin(System.currentTimeMillis() / 150.0).toFloat()
-            } else 1f
+                1f + 0.12f * sin(System.currentTimeMillis() / 140.0).toFloat()
+            } else squish
 
             val shakeX = shakeOffsets[arrow] ?: 0f
 

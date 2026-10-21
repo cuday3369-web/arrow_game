@@ -59,10 +59,204 @@ object GameEffects {
             .start()
     }
 
+    /** Twist-and-scale spring press animation for buttons using DynamicAnimation physics engine. */
+    fun twistSpringPress(view: View) {
+        view.animate().cancel()
+        view.scaleX = 0.88f
+        view.scaleY = 0.88f
+        view.rotation = -2.5f
+
+        val springX = SpringAnimation(view, DynamicAnimation.SCALE_X, 1.0f).apply {
+            spring.stiffness = SpringForce.STIFFNESS_MEDIUM
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        }
+        val springY = SpringAnimation(view, DynamicAnimation.SCALE_Y, 1.0f).apply {
+            spring.stiffness = SpringForce.STIFFNESS_MEDIUM
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        }
+        val springRot = SpringAnimation(view, DynamicAnimation.ROTATION, 0f).apply {
+            spring.stiffness = SpringForce.STIFFNESS_HIGH
+            spring.dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        }
+
+        springX.start()
+        springY.start()
+        springRot.start()
+    }
+
+    /** Attach spring click touch listener to buttons and views. */
+    fun attachSpringFeedback(view: View, reducedMotion: Boolean = false) {
+        view.setOnTouchListener { v, event ->
+            if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
+                if (!reducedMotion) {
+                    twistSpringPress(v)
+                }
+            }
+            false
+        }
+    }
+
+    /** Elastic spring drop-in entrance animation for the puzzle board using SpringAnimation physics. */
+    fun boardEntranceBounce(view: View, delayMs: Long = 60L) {
+        springViewTransition(
+            view = view,
+            initialTranslationY = -50f,
+            initialScale = 0.72f,
+            stiffness = SpringForce.STIFFNESS_LOW,
+            dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        )
+    }
+
+    /** Smooth physics spring transition using androidx.dynamicanimation physics engine. */
+    fun springViewTransition(
+        view: View,
+        initialTranslationY: Float = -60f,
+        initialScale: Float = 0.7f,
+        stiffness: Float = SpringForce.STIFFNESS_LOW,
+        dampingRatio: Float = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+    ) {
+        view.visibility = View.VISIBLE
+        view.alpha = 0f
+        view.translationY = view.resources.displayMetrics.density * initialTranslationY
+        view.scaleX = initialScale
+        view.scaleY = initialScale
+
+        view.animate().alpha(1f).setDuration(220).start()
+
+        val springY = SpringAnimation(view, DynamicAnimation.TRANSLATION_Y, 0f).apply {
+            spring.stiffness = stiffness
+            spring.dampingRatio = dampingRatio
+        }
+        val springScaleX = SpringAnimation(view, DynamicAnimation.SCALE_X, 1.0f).apply {
+            spring.stiffness = stiffness
+            spring.dampingRatio = dampingRatio
+        }
+        val springScaleY = SpringAnimation(view, DynamicAnimation.SCALE_Y, 1.0f).apply {
+            spring.stiffness = stiffness
+            spring.dampingRatio = dampingRatio
+        }
+
+        springY.start()
+        springScaleX.start()
+        springScaleY.start()
+    }
+
+    /** Celebratory pulse wave and 3D scale-tilt for board victory. */
+    fun boardVictoryWave(view: View, onEnd: (() -> Unit)? = null) {
+        view.animate().cancel()
+        view.animate()
+            .scaleX(1.12f)
+            .scaleY(1.12f)
+            .rotation(3f)
+            .setDuration(220)
+            .withEndAction {
+                view.animate()
+                    .scaleX(0.96f)
+                    .scaleY(0.96f)
+                    .rotation(-2f)
+                    .setDuration(180)
+                    .withEndAction {
+                        view.animate()
+                            .scaleX(1.0f)
+                            .scaleY(1.0f)
+                            .rotation(0f)
+                            .setDuration(220)
+                            .setInterpolator(OvershootInterpolator(2f))
+                            .withEndAction {
+                                onEnd?.invoke()
+                            }
+                            .start()
+                    }
+                    .start()
+            }
+            .start()
+    }
+
+    /** Elastic spring scale drop-in animation for dialog card containers using DynamicAnimation physics. */
+    fun popInDialogCard(cardView: View) {
+        springViewTransition(
+            view = cardView,
+            initialTranslationY = -80f,
+            initialScale = 0.5f,
+            stiffness = SpringForce.STIFFNESS_LOW,
+            dampingRatio = SpringForce.DAMPING_RATIO_MEDIUM_BOUNCY
+        )
+    }
+
+    /** Sparkle burst animation for star count label or reward stars. */
+    fun starSparkleBurst(view: View) {
+        view.animate().cancel()
+        view.animate()
+            .scaleX(1.45f)
+            .scaleY(1.45f)
+            .rotation(18f)
+            .setDuration(200)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .rotation(0f)
+                    .setDuration(280)
+                    .setInterpolator(OvershootInterpolator(2.5f))
+                    .start()
+            }
+            .start()
+    }
+
+    /** Rhythmic double heartbeat pulse animation for life/heart indicators. */
+    fun heartBeatPulse(view: View) {
+        view.animate().cancel()
+        view.animate()
+            .scaleX(1.28f)
+            .scaleY(1.28f)
+            .setDuration(130)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(110)
+                    .withEndAction {
+                        view.animate()
+                            .scaleX(1.20f)
+                            .scaleY(1.20f)
+                            .setDuration(120)
+                            .withEndAction {
+                                view.animate()
+                                    .scaleX(1.0f)
+                                    .scaleY(1.0f)
+                                    .setDuration(180)
+                                    .setInterpolator(OvershootInterpolator(2f))
+                                    .start()
+                            }
+                            .start()
+                    }
+                    .start()
+            }
+            .start()
+    }
+
+    /** Subtle pulse rhythm on timer tick. */
+    fun timerTickPulse(view: View) {
+        if (view.scaleX != 1.0f) return
+        view.animate().cancel()
+        view.animate()
+            .scaleX(1.08f)
+            .scaleY(1.08f)
+            .setDuration(120)
+            .withEndAction {
+                view.animate()
+                    .scaleX(1.0f)
+                    .scaleY(1.0f)
+                    .setDuration(180)
+                    .start()
+            }
+            .start()
+    }
+
     /** Handles touch feedback for buttons. */
     fun tap(view: View, reducedMotion: Boolean = false) {
         if (!reducedMotion) {
-            buttonPress(view)
+            twistSpringPress(view)
         }
     }
 
