@@ -10,7 +10,6 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
 import android.graphics.RectF
-import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
@@ -22,7 +21,7 @@ import kotlin.math.sin
 class PuzzleBoardView(context: Context) : View(context) {
 
     var puzzle: Puzzle = Puzzle(
-        "Loading", 5, 5, mutableListOf()
+        "Loading", 5, 5, mutableListOf(),
     )
         set(value) {
             cancelAnimations()
@@ -35,6 +34,7 @@ class PuzzleBoardView(context: Context) : View(context) {
     var boardBackgroundColor = GameTheme.PANEL
 
     private val exits = IdentityHashMap<Arrow, ValueAnimator>()
+    fun hasActiveExitAnimation(): Boolean = exits.isNotEmpty()
     private val shakes = IdentityHashMap<Arrow, ValueAnimator>()
     private val shakeOffsets = IdentityHashMap<Arrow, Float>()
     private val squishScales = IdentityHashMap<Arrow, Float>()
@@ -50,12 +50,18 @@ class PuzzleBoardView(context: Context) : View(context) {
     private var boardW = 0f
     private var boardH = 0f
 
-    // Pinch-to-zoom state & gesture isolation
+    // Pinch-to-zoom & single-finger pan state
     var scaleFactor = 1.0f
     private val minScale = 0.85f
     private val maxScale = 4.0f
     private var pivotFocusX = 0f
     private var pivotFocusY = 0f
+    var panOffsetX = 0f
+    var panOffsetY = 0f
+
+    private var lastTouchX = 0f
+    private var lastTouchY = 0f
+    private var isDragging = false
     private var isPinching = false
 
     private val scaleDetector = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
@@ -69,21 +75,6 @@ class PuzzleBoardView(context: Context) : View(context) {
             return true
         }
     })
-
-    fun animateZoomTo(targetScale: Float, pivotX: Float = width / 2f, pivotY: Float = height / 2f) {
-        val startScale = scaleFactor
-        ValueAnimator.ofFloat(startScale, targetScale).apply {
-            duration = 320L
-            interpolator = DecelerateInterpolator()
-            addUpdateListener { anim ->
-                scaleFactor = anim.animatedValue as Float
-                pivotFocusX = pivotX
-                pivotFocusY = pivotY
-                invalidate()
-            }
-            start()
-        }
-    }
 
     init {
         setLayerType(LAYER_TYPE_SOFTWARE, null)
@@ -100,10 +91,8 @@ class PuzzleBoardView(context: Context) : View(context) {
 
     fun isArrowAnimating(arrow: Arrow) = exits.containsKey(arrow)
 
-    fun isClear(arrow: Arrow): Boolean {
-        if (!arrow.active || isArrowAnimating(arrow)) return false
-        return PuzzleSolver.isClear(puzzle, arrow) { isArrowAnimating(it) }
-    }
+    fun isClear(arrow: Arrow): Boolean =
+        arrow.active && !isArrowAnimating(arrow) && PuzzleSolver.isClear(puzzle, arrow) { isArrowAnimating(it) }
 
     fun showHint(arrow: Arrow?) {
         hintedArrow = arrow
@@ -116,6 +105,9 @@ class PuzzleBoardView(context: Context) : View(context) {
     }
 
     fun cancelAnimations() {
+        panOffsetX = 0f
+        panOffsetY = 0f
+        scaleFactor = 1.0f
         val oldExits = exits.values.toList()
         val oldShakes = shakes.values.toList()
         exits.clear()
@@ -145,7 +137,7 @@ class PuzzleBoardView(context: Context) : View(context) {
             addUpdateListener {
                 val progress = it.animatedValue as Float
                 arrow.animProgress = progress
-                arrow.alpha = (1f - progress * 0.85f).coerceAtLeast(0f)
+                arrow.alpha = (1f - (progress * 0.85f)).coerceAtLeast(0f)
                 postInvalidateOnAnimation()
             }
 
@@ -211,7 +203,7 @@ class PuzzleBoardView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
-        if (puzzle.rows <= 0 || puzzle.cols <= 0) return
+        if ((puzzle.rows <= 0) || (puzzle.cols <= 0)) return
 
         val pad = 3f * density
         cell = min(
@@ -225,6 +217,7 @@ class PuzzleBoardView(context: Context) : View(context) {
         top = (height - boardH) / 2f
 
         canvas.save()
+        canvas.translate(panOffsetX, panOffsetY)
         val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
         val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
         canvas.scale(scaleFactor, scaleFactor, pX, pY)
@@ -298,8 +291,8 @@ class PuzzleBoardView(context: Context) : View(context) {
 
             val cumDists = FloatArray(polyline.size)
             cumDists[0] = 0f
-            for (i in 0 until polyLengths.size) {
-                cumDists[i + 1] = cumDists[i] + polyLengths[i]
+            polyLengths.forEachIndexed { i, length ->
+                cumDists[i + 1] = cumDists[i] + length
             }
 
             fun samplePolyline(dist: Float): PointF {
@@ -351,25 +344,19 @@ class PuzzleBoardView(context: Context) : View(context) {
                 }
             }
 
-            // 1. High contrast dark border outline (prevents merging/blending with adjacent arrows)
+            // 1. High contrast crisp dark border outline
             paint.style = Paint.Style.STROKE
             paint.strokeCap = Paint.Cap.ROUND
             paint.strokeJoin = Paint.Join.ROUND
-            paint.strokeWidth = cell * 0.16f * pulse
-            paint.color = Color.argb(200, 10, 15, 28)
-            paint.alpha = (arrow.alpha * 200).toInt().coerceIn(0, 255)
-            canvas.drawPath(snakingPath, paint)
-
-            // 2. Soft, reduced glow layer
-            paint.strokeWidth = cell * 0.13f * pulse
-            paint.color = color
-            paint.alpha = (arrow.alpha * 15).toInt().coerceIn(0, 255)
-            paint.setShadowLayer(1.5f * density, 0f, 0f, color)
-            canvas.drawPath(snakingPath, paint)
+            paint.strokeWidth = cell * 0.17f * pulse
+            paint.color = Color.rgb(8, 14, 26)
+            paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
             paint.clearShadowLayer()
+            canvas.drawPath(snakingPath, paint)
 
-            // 3. High contrast main body pipe stroke (bold & distinct)
-            paint.strokeWidth = cell * 0.11f * pulse
+            // 2. High contrast main body pipe stroke (sharp, crisp & vivid)
+            paint.strokeWidth = cell * 0.12f * pulse
+            paint.color = color
             paint.alpha = (arrow.alpha * 255).toInt().coerceIn(0, 255)
             canvas.drawPath(snakingPath, paint)
 
@@ -426,47 +413,80 @@ class PuzzleBoardView(context: Context) : View(context) {
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.pointerCount > 1) {
+        scaleDetector.onTouchEvent(event)
+
+        val action = event.actionMasked
+
+        if (event.pointerCount > 1 || scaleDetector.isInProgress) {
             isPinching = true
-            scaleDetector.onTouchEvent(event)
             return true
         }
 
-        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
-            isPinching = false
-            return true
-        }
-
-        if (event.actionMasked == MotionEvent.ACTION_UP) {
-            if (isPinching) {
+        when (action) {
+            MotionEvent.ACTION_DOWN -> {
                 isPinching = false
+                isDragging = false
+                lastTouchX = event.x
+                lastTouchY = event.y
                 return true
             }
 
-            if (cell <= 0f) return true
+            MotionEvent.ACTION_MOVE -> {
+                if (isPinching) return true
 
-            val pX = if (pivotFocusX != 0f) pivotFocusX else width / 2f
-            val pY = if (pivotFocusY != 0f) pivotFocusY else height / 2f
+                val dx = event.x - lastTouchX
+                val dy = event.y - lastTouchY
 
-            val localX = (event.x - pX) / scaleFactor + pX
-            val localY = (event.y - pY) / scaleFactor + pY
-
-            val col = ((localX - left) / cell).toInt()
-            val row = ((localY - top) / cell).toInt()
-
-            if (row in 0 until puzzle.rows && col in 0 until puzzle.cols) {
-                val arrow = puzzle.arrows.firstOrNull {
-                    it.active && it.occupies(row, col) && !isArrowAnimating(it)
+                if (!isDragging && (dx * dx + dy * dy > (6f * density) * (6f * density))) {
+                    isDragging = true
                 }
 
-                if (arrow != null) {
-                    clearHint()
-                    onArrowTapped?.invoke(arrow)
+                if (isDragging) {
+                    panOffsetX += dx
+                    panOffsetY += dy
+                    lastTouchX = event.x
+                    lastTouchY = event.y
+                    invalidate()
                 }
+                return true
             }
 
-            performClick()
-            return true
+            MotionEvent.ACTION_UP -> {
+                if (isPinching) {
+                    isPinching = false
+                    return true
+                }
+
+                if (isDragging) {
+                    isDragging = false
+                    return true
+                }
+
+                if (cell <= 0f) return true
+
+                val pX = if (scaleFactor != 1.0f && pivotFocusX != 0f) pivotFocusX else width / 2f
+                val pY = if (scaleFactor != 1.0f && pivotFocusY != 0f) pivotFocusY else height / 2f
+
+                val localX = (event.x - panOffsetX - pX) / scaleFactor + pX
+                val localY = (event.y - panOffsetY - pY) / scaleFactor + pY
+
+                val col = ((localX - left) / cell).toInt()
+                val row = ((localY - top) / cell).toInt()
+
+                if (row in 0 until puzzle.rows && col in 0 until puzzle.cols) {
+                    val arrow = puzzle.arrows.firstOrNull {
+                        it.active && it.occupies(row, col) && !isArrowAnimating(it)
+                    }
+
+                    if (arrow != null) {
+                        clearHint()
+                        onArrowTapped?.invoke(arrow)
+                        performClick()
+                        return true
+                    }
+                }
+                return true
+            }
         }
 
         return true

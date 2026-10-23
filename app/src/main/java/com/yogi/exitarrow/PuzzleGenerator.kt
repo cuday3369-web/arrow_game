@@ -161,6 +161,7 @@ object PuzzleGenerator {
                 var currR = behindR
                 var currC = behindC
 
+                @Suppress("UNUSED_VARIABLE")
                 for (step in 2 until targetLength) {
                     val neighbors = mutableListOf<Pair<Int, Int>>()
                     val dr = intArrayOf(-1, 1, 0, 0)

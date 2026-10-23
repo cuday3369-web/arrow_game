@@ -10,10 +10,10 @@ object GameAudio {
     private val executor = Executors.newSingleThreadExecutor()
 
     init {
-        try {
-            toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 80)
+        toneGen = try {
+            ToneGenerator(AudioManager.STREAM_MUSIC, 80)
         } catch (_: Exception) {
-            toneGen = null
+            null
         }
     }
 

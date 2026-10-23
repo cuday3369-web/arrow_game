@@ -4,11 +4,13 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 
+import androidx.core.content.edit
+
 class GameSaveRepository(context: Context) {
 
     private val prefs = context.getSharedPreferences(
         "exit_arrow_progress",
-        Context.MODE_PRIVATE
+        Context.MODE_PRIVATE,
     )
 
     fun saveProgress(
@@ -17,16 +19,16 @@ class GameSaveRepository(context: Context) {
         stars: Int,
         soundEnabled: Boolean,
         vibrationEnabled: Boolean,
-        reducedMotion: Boolean
+        reducedMotion: Boolean,
     ) {
-        prefs.edit()
-            .putInt("current_level", currentLevel)
-            .putInt("unlocked_level", maxOf(unlockedLevel, 1))
-            .putInt("total_stars", maxOf(stars, 0))
-            .putBoolean("sound_enabled", soundEnabled)
-            .putBoolean("vibration_enabled", vibrationEnabled)
-            .putBoolean("reduced_motion", reducedMotion)
-            .apply()
+        prefs.edit {
+            putInt("current_level", currentLevel)
+            putInt("unlocked_level", maxOf(unlockedLevel, 1))
+            putInt("total_stars", maxOf(stars, 0))
+            putBoolean("sound_enabled", soundEnabled)
+            putBoolean("vibration_enabled", vibrationEnabled)
+            putBoolean("reduced_motion", reducedMotion)
+        }
     }
 
     fun saveSnapshot(state: GameState) {
@@ -39,10 +41,10 @@ class GameSaveRepository(context: Context) {
             put("elapsed", state.elapsedMillis)
 
             put("arrows", JSONArray().apply {
-                state.arrows.forEach { arrow ->
+                state.arrows.forEach { (id, removed) ->
                     put(JSONObject().apply {
-                        put("id", arrow.id)
-                        put("removed", arrow.removed)
+                        put("id", id)
+                        put("removed", removed)
                     })
                 }
             })
@@ -52,7 +54,7 @@ class GameSaveRepository(context: Context) {
             })
         }
 
-        prefs.edit().putString("snapshot", json.toString()).apply()
+        prefs.edit { putString("snapshot", json.toString()) }
     }
 
     fun loadSnapshot(): GameState? {
@@ -71,8 +73,7 @@ class GameSaveRepository(context: Context) {
 
             val rewards = json.getJSONArray("rewardedLevels")
             val rewardedLevels = (0 until rewards.length())
-                .map { rewards.getInt(it) }
-                .toSet()
+                .mapTo(mutableSetOf()) { rewards.getInt(it) }
 
             GameState(
                 level = json.getInt("level"),
@@ -99,7 +100,7 @@ class GameSaveRepository(context: Context) {
 
     fun unlockLevel(level: Int) {
         val current = getUnlockedLevel()
-        prefs.edit().putInt("unlocked_level", maxOf(current, level, 1)).apply()
+        prefs.edit { putInt("unlocked_level", maxOf(current, level, 1)) }
     }
 
     fun addStars(stars: Int) {

@@ -6,7 +6,7 @@ enum class GamePhase {
 
 data class ArrowState(
     val id: String,
-    val removed: Boolean = false
+    val removed: Boolean = false,
 )
 
 data class GameState(
@@ -18,11 +18,11 @@ data class GameState(
     val hintsRemaining: Int = 3,
     val elapsedMillis: Long = 0L,
     val stars: Int = 0,
-    val rewardedLevels: Set<Int> = emptySet()
+    val rewardedLevels: Set<Int> = emptySet(),
 ) {
     val arrowsLeft: Int
-        get() = arrows.count { !it.removed }
+        get() = arrows.count { (_, removed) -> !removed }
 
     val isComplete: Boolean
-        get() = arrows.isNotEmpty() && arrowsLeft == 0
+        get() = arrows.isNotEmpty() && (arrowsLeft == 0)
 }

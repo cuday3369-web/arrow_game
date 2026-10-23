@@ -31,12 +31,21 @@ class GamePuzzleEngine : PuzzleEngine {
         val intId = arrowId.toIntOrNull() ?: return false
         val arrow = puzzle.arrows.firstOrNull { it.id == intId } ?: return false
         if (!arrow.active) return false
-        return PuzzleSolver.isClear(puzzle, arrow)
+
+        val removedIds = currentArrows.filter { it.removed }.mapNotNull { it.id.toIntOrNull() }.toSet()
+
+        return PuzzleSolver.isClear(puzzle, arrow) { other ->
+            !other.active || removedIds.contains(other.id)
+        }
     }
 
     override fun findHint(currentArrows: List<ArrowState>): String? {
         val puzzle = currentPuzzle ?: return null
-        val hint = PuzzleSolver.nextHint(puzzle) ?: return null
-        return hint.arrowId.toString()
+        val removedIds = currentArrows.filter { it.removed }.mapNotNull { it.id.toIntOrNull() }.toSet()
+        val activePuzzle = puzzle.copy(
+            arrows = puzzle.arrows.filter { !removedIds.contains(it.id) && it.active }.toMutableList(),
+        )
+        val (arrowId) = PuzzleSolver.nextHint(activePuzzle) ?: return null
+        return arrowId.toString()
     }
 }

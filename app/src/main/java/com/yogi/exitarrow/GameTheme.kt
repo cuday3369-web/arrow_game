@@ -25,7 +25,7 @@ object GameTheme {
         PURPLE,
         GOLD,
         GREEN,
-        rgb(255, 115, 160)
+        rgb(255, 115, 160),
     )
 
     fun isNightMode(context: Context): Boolean {

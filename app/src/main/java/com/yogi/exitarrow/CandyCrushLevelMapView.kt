@@ -3,13 +3,15 @@ package com.yogi.exitarrow
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.DashPathEffect
+import android.graphics.LinearGradient
 import android.graphics.Paint
-import android.graphics.Path
-import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Shader
+import android.graphics.Typeface
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.sin
+import kotlin.math.abs
+import kotlin.math.min
 
 class CandyCrushLevelMapView(
     context: Context,
@@ -23,289 +25,405 @@ class CandyCrushLevelMapView(
 
     private val density = resources.displayMetrics.density
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val nodeRadius = 34f * density // Bigger level circle nodes
-    private val levelSpacing = 92f * density
-    private val topMargin = 60f * density
+    private val rect = RectF()
 
-    private val nodePositions = mutableListOf<Pair<Float, Float>>()
-    private val clipRect = Rect()
+    private val stageSize = 25
+    private val stageNames = arrayOf(
+        "GREEN FIELDS",
+        "DESERT RUINS",
+        "ICE WORLD",
+        "VOLCANO"
+    )
 
-    private var tappedNodeIndex = -1
-    private var tappedNodeScale = 1.0f
-    private var lockedShakeIndex = -1
-    private var lockedShakeOffset = 0f
+    private val stageColors = intArrayOf(
+        Color.rgb(0, 220, 160),
+        Color.rgb(255, 165, 45),
+        Color.rgb(50, 190, 255),
+        Color.rgb(255, 75, 65)
+    )
 
-    init {
-        isClickable = true
+    private var selectedStage =
+        ((currentLevel - 1).coerceAtLeast(0) / stageSize).coerceIn(0, 3)
+
+    private var levelRects = mutableListOf<Pair<Int, RectF>>()
+    private var stageRects = mutableListOf<RectF>()
+
+    private var tabScrollX = 0f
+    private var maxTabScrollX = 0f
+    private var tabLastTouchX = 0f
+    private var isTabDragging = false
+
+    private val dp: (Float) -> Float = { it * density }
+
+    private fun text(
+        canvas: Canvas,
+        value: String,
+        x: Float,
+        y: Float,
+        size: Float,
+        color: Int,
+        bold: Boolean = true
+    ) {
+        paint.shader = null
+        paint.style = Paint.Style.FILL
+        paint.color = color
+        paint.textSize = dp(size)
+        paint.typeface = if (bold) {
+            Typeface.create("sans-serif", Typeface.BOLD)
+        } else {
+            Typeface.create("sans-serif", Typeface.NORMAL)
+        }
+        paint.textAlign = Paint.Align.CENTER
+        canvas.drawText(value, x, y, paint)
     }
 
-    override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
-        val w = MeasureSpec.getSize(widthMeasureSpec)
-        val h = (totalLevels * levelSpacing + topMargin * 2f).toInt()
-        setMeasuredDimension(w, resolveSize(h, heightMeasureSpec))
+    private fun rounded(
+        canvas: Canvas,
+        r: RectF,
+        radius: Float,
+        color: Int,
+        border: Int? = null,
+        stroke: Float = 1f
+    ) {
+        paint.shader = null
+        paint.style = Paint.Style.FILL
+        paint.color = color
+        canvas.drawRoundRect(r, dp(radius), dp(radius), paint)
+
+        if (border != null) {
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = dp(stroke)
+            paint.color = border
+            canvas.drawRoundRect(r, dp(radius), dp(radius), paint)
+            paint.style = Paint.Style.FILL
+        }
+    }
+
+    override fun onMeasure(
+        widthMeasureSpec: Int,
+        heightMeasureSpec: Int
+    ) {
+        val width = MeasureSpec.getSize(widthMeasureSpec)
+        val height = MeasureSpec.getSize(heightMeasureSpec)
+        setMeasuredDimension(width, height)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        val w = width.toFloat().coerceAtLeast(1f)
-        val h = height.toFloat().coerceAtLeast(1f)
-        val centerX = w / 2f
-        val amplitude = w * 0.28f
+        val w = width.toFloat()
+        val h = height.toFloat()
+        if (w <= 0f || h <= 0f) return
 
-        // Get visible viewport clip bounds for 60/120 FPS infinite scrolling
-        canvas.getClipBounds(clipRect)
-        val visibleTop = clipRect.top.toFloat() - levelSpacing * 2f
-        val visibleBottom = clipRect.bottom.toFloat() + levelSpacing * 2f
+        val accent = stageColors[selectedStage]
 
-        // Fill background canvas with 3D deep ocean theme (#061325)
-        canvas.drawColor(Color.rgb(6, 19, 37))
+        // Deep-space background
+        paint.shader = LinearGradient(
+            0f, 0f, w, h,
+            intArrayOf(
+                Color.rgb(3, 10, 31),
+                Color.rgb(5, 24, 55),
+                Color.rgb(8, 10, 31)
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = null
 
-        // Draw animated 3D ocean caustics & rising aquatic bubbles
-        val timeSec = System.currentTimeMillis() / 1000f
+        // Decorative stars
         paint.style = Paint.Style.FILL
-        for (i in 0 until 50) {
-            val bx = ((i * 147.5f + sin(timeSec + i) * 15f) % w)
-            val by = ((i * 219.3f - timeSec * 25f) % h).let { if (it < 0) it + h else it }
-            if (by in visibleTop..visibleBottom) {
-                val r = (1.8f + (i % 4) * 1.2f) * density
-                paint.color = Color.argb(80, 68, 224, 255)
-                canvas.drawCircle(bx, by, r, paint)
+        for (i in 0 until 55) {
+            val x = ((i * 83f + 17f) % w)
+            val y = ((i * 109f + 31f) % h)
+            paint.color = Color.argb(
+                90 + (i % 5) * 25,
+                120, 210, 255
+            )
+            canvas.drawCircle(x, y, dp(1f + (i % 3) * 0.5f), paint)
+        }
+
+        val margin = dp(12f)
+        val contentWidth = w - margin * 2f
+
+        // Header Title
+        rect.set(margin, dp(10f), w - margin, dp(58f))
+        rounded(
+            canvas, rect, 16f,
+            Color.rgb(5, 26, 67), accent, 2f
+        )
+        text(
+            canvas, "LEVEL MAP",
+            w / 2f, dp(40f), 24f, Color.WHITE
+        )
+
+        // Stage selection tabs (horizontally scrollable row)
+        stageRects.clear()
+        val tabGap = dp(8f)
+        val tabWidth = dp(145f)
+        val tabTop = dp(66f)
+        val tabHeight = dp(77f) // +20% height increase
+        val totalTabsWidth = 4 * tabWidth + 3 * tabGap
+
+        maxTabScrollX = (totalTabsWidth - contentWidth).coerceAtLeast(0f)
+        tabScrollX = tabScrollX.coerceIn(0f, maxTabScrollX)
+
+        canvas.save()
+        val tabClipRect = RectF(margin, tabTop - dp(2f), w - margin, tabTop + tabHeight + dp(2f))
+        canvas.clipRect(tabClipRect)
+
+        for (stage in 0..3) {
+            val left = margin + stage * (tabWidth + tabGap) - tabScrollX
+            val tab = RectF(
+                left, tabTop,
+                left + tabWidth, tabTop + tabHeight
+            )
+            stageRects.add(tab)
+
+            val unlockedStage = stage * stageSize + 1 <= unlockedLevel
+            val tabColor = if (stage == selectedStage) {
+                Color.rgb(10, 50, 93)
+            } else {
+                Color.rgb(13, 23, 46)
             }
+
+            rounded(
+                canvas, tab, 12f,
+                tabColor,
+                if (stage == selectedStage) stageColors[stage]
+                else Color.rgb(55, 78, 120),
+                if (stage == selectedStage) 2.2f else 1f
+            )
+
+            // Row 1: WORLD Number (+25% font size)
+            text(
+                canvas, "WORLD ${stage + 1}",
+                tab.centerX(), tab.top + dp(22f),
+                13.8f,
+                if (unlockedStage) Color.WHITE
+                else Color.rgb(135, 151, 181)
+            )
+
+            // Row 2: World Name (+25% font size)
+            text(
+                canvas, stageNames[stage],
+                tab.centerX(), tab.top + dp(42f),
+                12.5f,
+                if (unlockedStage) stageColors[stage]
+                else Color.rgb(115, 131, 161)
+            )
+
+            // Row 3: Level count ratio (+25% font size)
+            val firstLvl = stage * stageSize + 1
+            val lastLvl = min(firstLvl + stageSize - 1, totalLevels)
+            val completedInStage = (firstLvl..lastLvl).count { it < unlockedLevel }
+
+            text(
+                canvas, "$completedInStage / $stageSize",
+                tab.centerX(), tab.top + dp(62f),
+                13.8f,
+                if (unlockedStage) Color.rgb(255, 211, 65)
+                else Color.GRAY
+            )
         }
+        canvas.restore()
 
-        nodePositions.clear()
+        // Five-by-five level grid directly below scrollable stage tabs
+        levelRects.clear()
 
-        // Calculate positions along a winding 3D S-curve (Level 1 at bottom, totalLevels at top)
-        for (i in 1..totalLevels) {
-            val index = totalLevels - i
-            val y = topMargin + index * levelSpacing
-            val x = centerX + sin(i * 0.55f) * amplitude
-            nodePositions.add(Pair(x, y))
-        }
+        val gridLeft = margin + dp(3f)
+        val gridRight = w - margin - dp(3f)
+        val gridTop = dp(154f)
+        val bottomArea = dp(32f)
 
-        // Draw winding circular connection lines connecting level nodes
-        if (nodePositions.size > 1) {
-            val path = Path()
-            var pathStarted = false
+        val availableWidth = gridRight - gridLeft
+        val availableHeight = h - gridTop - bottomArea
 
-            for (i in 1 until nodePositions.size) {
-                val prev = nodePositions[i - 1]
-                val curr = nodePositions[i]
+        val gapX = dp(7f)
+        val gapY = dp(9f)
 
-                if ((prev.second in visibleTop..visibleBottom) || (curr.second in visibleTop..visibleBottom)) {
-                    if (!pathStarted) {
-                        path.moveTo(prev.first, prev.second)
-                        pathStarted = true
-                    }
-                    val midY = (prev.second + curr.second) / 2f
-                    path.cubicTo(
-                        prev.first, midY,
-                        curr.first, midY,
-                        curr.first, curr.second
-                    )
-                } else {
-                    pathStarted = false
-                }
+        val cellWidth = (availableWidth - gapX * 4f) / 5f
+        val cellHeight = min(
+            dp(86f), // +20% height increase
+            (availableHeight - gapY * 4f) / 5f
+        )
+
+        val gridHeight = cellHeight * 5f + gapY * 4f
+        val actualTop = gridTop +
+            ((availableHeight - gridHeight) / 2f).coerceAtLeast(0f)
+
+        val firstLevel = selectedStage * stageSize + 1
+
+        for (index in 0 until stageSize) {
+            val row = index / 5
+            val col = index % 5
+            val levelNumber = firstLevel + index
+
+            if (levelNumber > totalLevels) continue
+
+            val left = gridLeft + col * (cellWidth + gapX)
+            val top = actualTop + row * (cellHeight + gapY)
+
+            val levelRect = RectF(
+                left, top,
+                left + cellWidth, top + cellHeight
+            )
+            levelRects.add(levelNumber to levelRect)
+
+            val isUnlocked = levelNumber <= unlockedLevel
+            val isCurrent = levelNumber == currentLevel
+            val stars = getBestStars(levelNumber).coerceIn(0, 3)
+
+            val fillColor = when {
+                isCurrent -> Color.rgb(190, 150, 45)
+                isUnlocked -> Color.rgb(5, 104, 190)
+                else -> Color.rgb(25, 35, 59)
             }
 
-            // Glow / Shadow stroke
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 10f * density
-            paint.color = Color.argb(70, 0, 180, 255)
-            canvas.drawPath(path, paint)
+            val borderColor = when {
+                isCurrent -> Color.rgb(215, 185, 90)
+                isUnlocked -> accent
+                else -> Color.rgb(68, 83, 117)
+            }
 
-            // Main 3D ocean stream connection line stroke
-            paint.strokeWidth = 6f * density
-            paint.color = GameTheme.CYAN
-            paint.pathEffect = DashPathEffect(floatArrayOf(16f * density, 12f * density), 0f)
-            canvas.drawPath(path, paint)
-            paint.pathEffect = null
-        }
-
-        // Draw circular 3D level nodes (only visible ones)
-        for (i in 1..totalLevels) {
-            val pos = nodePositions[i - 1]
-            val origX = pos.first
-            val y = pos.second
-
-            if (y !in visibleTop..visibleBottom) continue
-
-            val isUnlocked = i <= unlockedLevel
-            val isCurrent = i == currentLevel
-            val stars = if (isUnlocked) getBestStars(i) else 0
-
-            val scale = if (i == tappedNodeIndex) tappedNodeScale else 1f
-            val shakeX = if (i == lockedShakeIndex) lockedShakeOffset else 0f
-            val x = origX + shakeX
-            val radius = nodeRadius * scale
-
-            // 1. Draw 3D Under-Shadow for depth elevation
-            paint.style = Paint.Style.FILL
-            paint.color = Color.argb(160, 2, 8, 18)
-            canvas.drawCircle(x, y + 5f * density, radius, paint)
-
-            // 2. Draw current level glowing aura ring
+            // Glow around current level
             if (isCurrent) {
                 paint.style = Paint.Style.STROKE
-                paint.strokeWidth = 5f * density
-                paint.color = GameTheme.GOLD
-                val pulse = 1f + 0.12f * sin(System.currentTimeMillis() / 150.0).toFloat()
-                canvas.drawCircle(x, y, radius * 1.35f * pulse, paint)
-                postInvalidateOnAnimation()
+                paint.strokeWidth = dp(3.5f)
+                paint.color = Color.argb(70, 215, 185, 90)
+                val glow = RectF(levelRect)
+                glow.inset(-dp(2.5f), -dp(2.5f))
+                canvas.drawRoundRect(glow, dp(12f), dp(12f), paint)
             }
 
-            // 3. Draw node circle background
-            paint.style = Paint.Style.FILL
-            paint.color = when {
-                isCurrent -> GameTheme.GOLD
-                isUnlocked -> when (i % 3) {
-                    0 -> GameTheme.CYAN
-                    1 -> GameTheme.PURPLE
-                    else -> GameTheme.GREEN
-                }
-                else -> Color.rgb(20, 28, 44)
-            }
-            canvas.drawCircle(x, y, radius, paint)
+            rounded(
+                canvas, levelRect, 10f,
+                fillColor, borderColor, 1.7f
+            )
 
-            // 4. Draw 3D metallic/crystal border stroke
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = 3.5f * density
-            paint.color = if (isUnlocked) GameTheme.WHITE else Color.rgb(45, 58, 88)
-            canvas.drawCircle(x, y, radius, paint)
-
-            // Draw text/icon inside node
-            paint.style = Paint.Style.FILL
-            paint.textAlign = Paint.Align.CENTER
-
-            val diffName = PuzzleGenerator.difficultyForLevel(i)
-            val shapeTheme = PuzzleGenerator.shapeThemeForLevel(i)
+            val centerX = levelRect.centerX()
 
             if (isUnlocked) {
-                paint.textSize = 20f * density * scale
-                paint.color = if (isCurrent) GameTheme.BACKGROUND else GameTheme.WHITE
-                paint.isFakeBoldText = true
-                val textY = y - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText("$i", x, textY, paint)
+                // Level number at the top (+25% font size)
+                text(
+                    canvas,
+                    levelNumber.toString(),
+                    centerX,
+                    levelRect.top + cellHeight * 0.48f,
+                    if (cellWidth < dp(55f)) 18.5f else 22.5f,
+                    if (isCurrent) Color.rgb(30, 30, 45) else Color.WHITE
+                )
 
-                // Row 1: BOLD difficulty tier name
-                paint.textSize = 12f * density
-                paint.isFakeBoldText = true
-                paint.color = if (i % 5 == 0) GameTheme.RED else GameTheme.CYAN
-                canvas.drawText(diffName, x, y + radius + 16f * density, paint)
-
-                // Row 2: BOLD Shape Theme name (e.g. "Heart Shaped Arrow Level ♥")
-                paint.textSize = 9.5f * density // Adjusted font size to fit long shape phrases
-                paint.isFakeBoldText = true
-                paint.color = GameTheme.GOLD
-                canvas.drawText(shapeTheme, x, y + radius + 28f * density, paint)
-
-                // Row 3: Only show earned stars (hide unearned stars)
-                val starStr = when (stars) {
+                // Earned stars below the number (+25% font size)
+                val starText = when (stars) {
                     3 -> "★★★"
-                    2 -> "★★"
-                    1 -> "★"
-                    else -> ""
+                    2 -> "★★☆"
+                    1 -> "★☆☆"
+                    else -> "☆☆☆"
                 }
-                if (starStr.isNotEmpty()) {
-                    paint.textSize = 11f * density
-                    paint.color = GameTheme.GOLD
-                    canvas.drawText(starStr, x, y + radius + 40f * density, paint)
-                }
+
+                text(
+                    canvas,
+                    starText,
+                    centerX,
+                    levelRect.bottom - dp(8f),
+                    12.5f,
+                    if (stars > 0) Color.rgb(255, 218, 66)
+                    else Color.rgb(117, 139, 170)
+                )
             } else {
-                paint.textSize = 16f * density * scale
-                paint.color = GameTheme.MUTED
-                val textY = y - (paint.descent() + paint.ascent()) / 2f
-                canvas.drawText("🔒", x, textY, paint)
+                // Locked level: number on top (+25% font size)
+                text(
+                    canvas,
+                    levelNumber.toString(),
+                    centerX,
+                    levelRect.top + cellHeight * 0.43f,
+                    if (cellWidth < dp(55f)) 18.5f else 22.5f,
+                    Color.rgb(174, 190, 218)
+                )
 
-                // Draw BOLD difficulty tier name & Shape Theme & "LOCKED" label below locked node
-                paint.textSize = 11f * density
-                paint.isFakeBoldText = true
-                paint.color = Color.rgb(130, 148, 180)
-                canvas.drawText(diffName, x, y + radius + 15f * density, paint)
-
-                paint.textSize = 8.5f * density // Adjusted font size to fit long shape phrases
-                paint.isFakeBoldText = true
-                paint.color = Color.rgb(160, 175, 205)
-                canvas.drawText(shapeTheme, x, y + radius + 26f * density, paint)
-
-                paint.textSize = 8f * density
-                paint.isFakeBoldText = true
-                paint.color = Color.rgb(90, 105, 135)
-                canvas.drawText("LOCKED", x, y + radius + 37f * density, paint)
+                // Lock symbol directly below the number (+25% font size)
+                text(
+                    canvas,
+                    "🔒",
+                    centerX,
+                    levelRect.bottom - dp(8f),
+                    22.5f,
+                    Color.LTGRAY
+                )
             }
         }
+
+        // Footer instruction (+25% font size)
+        text(
+            canvas,
+            "SELECT AN UNLOCKED LEVEL TO PLAY",
+            w / 2f, h - dp(10f),
+            12.5f, Color.rgb(158, 198, 236)
+        )
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        if (event.actionMasked != MotionEvent.ACTION_UP) return true
+        val x = event.x
+        val y = event.y
 
-        val touchX = event.x
-        val touchY = event.y
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                isTabDragging = false
+                tabLastTouchX = x
+                return true
+            }
 
-        for (i in 1..totalLevels) {
-            if (i > nodePositions.size) break
-            val pos = nodePositions[i - 1]
-            val dx = touchX - pos.first
-            val dy = touchY - pos.second
-            val distSq = dx * dx + dy * dy
-
-            if (distSq <= (nodeRadius * 1.5f) * (nodeRadius * 1.5f)) {
-                performClick()
-                if (i <= unlockedLevel) {
-                    animateNodeBounce(i) {
-                        onLevelSelected(i)
+            MotionEvent.ACTION_MOVE -> {
+                if (maxTabScrollX > 0f && y in dp(60f)..dp(140f)) {
+                    val dx = x - tabLastTouchX
+                    if (!isTabDragging && abs(dx) > dp(3f)) {
+                        isTabDragging = true
                     }
-                } else {
-                    animateLockedShake(i) {
-                        onLockedLevelTapped?.invoke(i)
+                    if (isTabDragging) {
+                        tabScrollX = (tabScrollX - dx).coerceIn(0f, maxTabScrollX)
+                        tabLastTouchX = x
+                        invalidate()
+                        return true
                     }
                 }
                 return true
             }
+
+            MotionEvent.ACTION_UP -> {
+                if (isTabDragging) {
+                    isTabDragging = false
+                    return true
+                }
+
+                for (stage in stageRects.indices) {
+                    if (stageRects[stage].contains(x, y)) {
+                        selectedStage = stage
+                        invalidate()
+                        performClick()
+                        return true
+                    }
+                }
+
+                for ((levelNumber, levelRect) in levelRects) {
+                    if (levelRect.contains(x, y)) {
+                        performClick()
+
+                        if (levelNumber <= unlockedLevel) {
+                            onLevelSelected(levelNumber)
+                        } else {
+                            onLockedLevelTapped?.invoke(levelNumber)
+                        }
+                        return true
+                    }
+                }
+
+                performClick()
+                return true
+            }
         }
-        performClick()
+
         return true
-    }
-
-    private fun animateNodeBounce(levelIndex: Int, onComplete: () -> Unit) {
-        tappedNodeIndex = levelIndex
-        android.animation.ValueAnimator.ofFloat(1.0f, 1.35f, 1.0f).apply {
-            duration = 240L
-            interpolator = android.view.animation.OvershootInterpolator(2.5f)
-            addUpdateListener { anim ->
-                tappedNodeScale = anim.animatedValue as Float
-                postInvalidateOnAnimation()
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    tappedNodeIndex = -1
-                    tappedNodeScale = 1.0f
-                    onComplete()
-                }
-            })
-            start()
-        }
-    }
-
-    private fun animateLockedShake(levelIndex: Int, onComplete: () -> Unit) {
-        lockedShakeIndex = levelIndex
-        android.animation.ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 320L
-            addUpdateListener { anim ->
-                val p = anim.animatedValue as Float
-                lockedShakeOffset = (sin(p * Math.PI * 6) * (1f - p) * 10f * density).toFloat()
-                postInvalidateOnAnimation()
-            }
-            addListener(object : android.animation.AnimatorListenerAdapter() {
-                override fun onAnimationEnd(animation: android.animation.Animator) {
-                    lockedShakeIndex = -1
-                    lockedShakeOffset = 0f
-                    onComplete()
-                }
-            })
-            start()
-        }
     }
 
     override fun performClick(): Boolean {

@@ -1,4 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Exit Arrow</string>
+    <string name="preparing_level">Preparing level %1$d…</string>
+    <string name="timer_format">⏱ %1$02d:%2$02d</string>
+    <string name="puzzle_grid_info">%1$s · %2$d×%3$d Grid</string>
+    <string name="blocked_hint">Blocked! Look for an arrow with a clear path.</string>
+    <string name="level_completed_title">🎉 LEVEL %1$d COMPLETED!</string>
+    <string name="nice_move">Nice move!</string>
+    <string name="next_arrow_prompt">Great! Choose your next clear arrow.</string>
+    <string name="arrow_highlighted">💡 Clear arrow #%1$d highlighted!</string>
+    <string name="no_hints_left">No hints left. Reset or keep trying.</string>
+    <string name="stars_count_format">★ %1$d</string>
+    <string name="no_solution_found">No solution found or wait for animation to finish.</string>
+    <string name="wait_animation_prompt">Wait for the current animation to finish.</string>
+    <string name="level_label_format">LEVEL %1$d</string>
+    <string name="pause_button_label">Ⅱ PAUSE</string>
+    <string name="moves_stat_format">⇄ %1$d</string>
+    <string name="game_resumed_prompt">Resumed. Find your next clear arrow.</string>
+    <string name="lives_stat_format">%1$s</string>
+    <string name="arrows_stat_format">➜ %1$d</string>
+    <string name="hint_button_format">💡 HINT (%1$d)</string>
+    <string name="settings_title">SETTINGS</string>
+    <string name="settings_subtitle">PERSONALIZE YOUR GAME</string>
+    <string name="settings_done_btn">DONE</string>
 </resources>

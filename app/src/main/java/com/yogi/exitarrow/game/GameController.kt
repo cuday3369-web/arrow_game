@@ -6,7 +6,7 @@ import android.os.Looper
 class GameController(
     private val engine: PuzzleEngine,
     private val saves: GameSaveRepository,
-    private val onStateChanged: (GameState) -> Unit
+    private val onStateChanged: (GameState) -> Unit,
 ) {
     private val handler = Handler(Looper.getMainLooper())
 
@@ -24,7 +24,7 @@ class GameController(
 
     private val timer = object : Runnable {
         override fun run() {
-            if (!active || state.phase != GamePhase.PLAYING) return
+            if (!active || (state.phase != GamePhase.PLAYING)) return
 
             val now = android.os.SystemClock.elapsedRealtime()
             val delta = (now - lastTick).coerceAtLeast(0L)
@@ -44,22 +44,16 @@ class GameController(
         val safeLevel = level.coerceAtLeast(1)
         val arrows = engine.createLevel(safeLevel)
 
-        val initialHints = when {
-            safeLevel <= 20 -> 3
-            safeLevel <= 50 -> 2
-            else -> 1
-        }
-
         state = GameState(
             level = safeLevel,
             phase = GamePhase.PLAYING,
             arrows = arrows,
             moves = 0,
             lives = 3,
-            hintsRemaining = initialHints,
+            hintsRemaining = 1,
             elapsedMillis = 0L,
             stars = totalStars,
-            rewardedLevels = state.rewardedLevels
+            rewardedLevels = state.rewardedLevels,
         )
 
         active = true
@@ -92,7 +86,7 @@ class GameController(
     fun tapArrow(arrowId: String) {
         if (state.phase != GamePhase.PLAYING) return
 
-        val arrow = state.arrows.find { it.id == arrowId } ?: return
+        val arrow = state.arrows.find { (id) -> id == arrowId } ?: return
         if (arrow.removed) return
 
         if (!engine.canExit(arrowId, state.arrows)) {
@@ -104,7 +98,7 @@ class GameController(
                     GamePhase.LOST
                 } else {
                     GamePhase.PLAYING
-                }
+                },
             )
 
             if (state.phase == GamePhase.LOST) stopTimer()
@@ -141,6 +135,11 @@ class GameController(
         return validId
     }
 
+    fun useExtraHint(): String? {
+        if (state.phase != GamePhase.PLAYING) return null
+        return engine.findHint(state.arrows)
+    }
+
     fun reset() {
         start(state.level)
     }
@@ -154,41 +153,79 @@ class GameController(
     }
 
     fun completeLevel() {
-        if (state.phase == GamePhase.WON) return
+        if (state.phase == GamePhase.WON ||
+            state.phase == GamePhase.LOST
+        ) return
 
         stopTimer()
 
+        val initialHints = when {
+            state.level <= 20 -> 3
+            state.level <= 50 -> 2
+            else -> 1
+        }
+
+        val noHintsUsed = state.hintsRemaining == initialHints
+
         val starsEarned = when {
-            state.lives == 3 -> 3
+            state.lives == 3 && noHintsUsed -> 3
             state.lives >= 2 -> 2
             else -> 1
         }
 
-        val firstCompletion = !state.rewardedLevels.contains(state.level)
-        if (firstCompletion) {
-            totalStars += starsEarned
-            saves.addStars(starsEarned)
-        }
+        val previousBestStars = saves.bestStars(state.level)
+        val additionalStars =
+            (starsEarned - previousBestStars).coerceAtLeast(0)
 
         saves.saveBestMoves(state.level, state.moves)
         saves.saveBestStars(state.level, starsEarned)
 
+        if (additionalStars > 0) {
+            saves.addStars(additionalStars)
+        }
+
+        totalStars = saves.getStars()
+
         unlockedLevel = maxOf(unlockedLevel, state.level + 1)
         saves.unlockLevel(unlockedLevel)
-
-        val newRewarded = if (firstCompletion) {
-            state.rewardedLevels + state.level
-        } else {
-            state.rewardedLevels
-        }
 
         state = state.copy(
             phase = GamePhase.WON,
             stars = totalStars,
-            rewardedLevels = newRewarded
+            rewardedLevels = state.rewardedLevels + state.level,
         )
 
         persist()
+    }
+
+    fun grantBonusLife(): Boolean {
+        if (state.phase != GamePhase.PLAYING || state.lives >= 3) {
+            return false
+        }
+
+        state = state.copy(
+            lives = (state.lives + 1).coerceAtMost(3)
+        )
+
+        publish()
+        persist()
+        return true
+    }
+
+    fun spendStars(amount: Int): Boolean {
+        if (amount <= 0) return false
+
+        totalStars = saves.getStars()
+        if (totalStars < amount) return false
+
+        saves.addStars(-amount)
+        totalStars = saves.getStars()
+
+        state = state.copy(stars = totalStars)
+
+        publish()
+        persist()
+        return true
     }
 
     fun setSoundEnabled(enabled: Boolean) {
@@ -223,10 +260,10 @@ class GameController(
     fun restoreOrStart() {
         val saved = saves.loadSnapshot()
 
-        if (saved != null &&
+        if ((saved != null) &&
             saved.arrows.isNotEmpty() &&
-            saved.phase != GamePhase.WON &&
-            saved.phase != GamePhase.LOST
+            (saved.phase != GamePhase.WON) &&
+            (saved.phase != GamePhase.LOST)
         ) {
             handler.removeCallbacks(timer)
             active = false

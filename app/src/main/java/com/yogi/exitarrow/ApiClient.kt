@@ -5,7 +5,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 class ApiClient(
-    private val baseUrl: String
+    private val baseUrl: String,
 ) {
     fun fetchLevel(level: Int): Puzzle? {
         return request("$baseUrl/level/$level") { json ->
@@ -17,12 +17,12 @@ class ApiClient(
             for (i in 0 until array.length()) {
                 val item = array.getJSONObject(i)
                 val direction = Direction.fromString(
-                    item.getString("direction")
+                    item.getString("direction"),
                 )
 
                 val id = item.optInt("id", i + 1)
                 val color = GameTheme.ARROW_COLORS[
-                    i % GameTheme.ARROW_COLORS.size
+                    i % GameTheme.ARROW_COLORS.size,
                 ]
 
                 val pathList = mutableListOf<Pair<Int, Int>>()
@@ -67,7 +67,7 @@ class ApiClient(
             connection.readTimeout = 2000
             connection.requestMethod = "GET"
 
-            val success = connection.responseCode in 200..299
+            val success = (connection.responseCode in 200..299)
             connection.disconnect()
             success
         } catch (_: Exception) {

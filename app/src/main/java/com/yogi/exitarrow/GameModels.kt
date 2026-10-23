@@ -13,16 +13,16 @@ class Arrow(
     val path: List<Pair<Int, Int>>, // Snaking cell points from tail (first) to head (last)
     direction: Direction,           // Pointing direction of arrowhead at path.last()
     val color: Int,
-    var active: Boolean = true
+    var active: Boolean = true,
 ) {
     val direction: Direction = if (path.size >= 2) {
-        val p0 = path[path.size - 2]
-        val head = path.last()
+        val (p0Row, p0Col) = path[path.size - 2]
+        val (headRow, headCol) = path.last()
         when {
-            head.first < p0.first -> Direction.UP
-            head.first > p0.first -> Direction.DOWN
-            head.second < p0.second -> Direction.LEFT
-            head.second > p0.second -> Direction.RIGHT
+            headRow < p0Row -> Direction.UP
+            headRow > p0Row -> Direction.DOWN
+            headCol < p0Col -> Direction.LEFT
+            headCol > p0Col -> Direction.RIGHT
             else -> direction
         }
     } else {
@@ -43,7 +43,7 @@ class Arrow(
     val col: Int get() = headCol
 
     fun occupies(r: Int, c: Int): Boolean =
-        path.any { it.first == r && it.second == c }
+        path.any { (pr, pc) -> (pr == r) && (pc == c) }
 
     fun resetAnimation() {
         animProgress = 0f
@@ -60,10 +60,10 @@ data class Puzzle(
     val arrows: MutableList<Arrow>,
     val level: Int = 1,
     val difficulty: String = "Easy",
-    val seed: Long = 0L
+    val seed: Long = 0L,
 ) {
     init {
-        require(rows > 0 && cols > 0)
+        require((rows > 0) && (cols > 0))
         require(arrows.all { arrow ->
             arrow.path.all { (r, c) -> r in 0 until rows && c in 0 until cols }
         })

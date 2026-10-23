@@ -5,7 +5,7 @@ object PuzzleSolver {
     fun blockers(
         puzzle: Puzzle,
         arrow: Arrow,
-        isAnimating: ((Arrow) -> Boolean)? = null
+        isAnimating: ((Arrow) -> Boolean)? = null,
     ): List<Arrow> {
         if (!arrow.active) return emptyList()
 
@@ -23,7 +23,7 @@ object PuzzleSolver {
                 Direction.DOWN -> r++
             }
 
-            if (r !in 0 until puzzle.rows || c !in 0 until puzzle.cols) {
+            if ((r !in 0 until puzzle.rows) || (c !in 0 until puzzle.cols)) {
                 break
             }
 
@@ -46,7 +46,7 @@ object PuzzleSolver {
     fun isClear(
         puzzle: Puzzle,
         arrow: Arrow,
-        isAnimating: ((Arrow) -> Boolean)? = null
+        isAnimating: ((Arrow) -> Boolean)? = null,
     ): Boolean =
         arrow.active && blockers(puzzle, arrow, isAnimating).isEmpty()
 
@@ -58,7 +58,9 @@ object PuzzleSolver {
      * A deterministic valid order proves the puzzle is solvable.
      */
     fun solveOrder(puzzle: Puzzle): List<Int>? {
-        val activeMap = puzzle.arrows.associate { it.id to true }.toMutableMap()
+        val activeMap = puzzle.arrows
+            .associateBy({ it.id }, { it.active })
+            .toMutableMap()
         val result = mutableListOf<Int>()
 
         fun isClearInSimulation(arrow: Arrow): Boolean {
@@ -79,7 +81,9 @@ object PuzzleSolver {
                 }
 
                 if (puzzle.arrows.any { other ->
-                        activeMap[other.id] == true && other.occupies(r, c)
+                        other.id != arrow.id &&
+                            activeMap[other.id] == true &&
+                            other.occupies(r, c)
                     }) {
                     return false
                 }
