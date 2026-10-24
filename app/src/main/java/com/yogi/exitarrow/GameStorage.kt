@@ -11,7 +11,7 @@ class GameStorage(context: Context) {
     )
 
     fun loadProgress() = GameProgress(
-        unlockedLevel = prefs.getInt("unlocked_level", 1).coerceAtLeast(1),
+        unlockedLevel = prefs.getInt("unlocked_level", 1).coerceIn(1, 100),
         totalStars = prefs.getInt("total_stars", 0).coerceAtLeast(0),
         soundEnabled = prefs.getBoolean("sound_enabled", true),
         vibrationEnabled = prefs.getBoolean("vibration_enabled", true),
@@ -31,7 +31,7 @@ class GameStorage(context: Context) {
     fun unlockLevel(level: Int) {
         val current = prefs.getInt("unlocked_level", 1)
         prefs.edit()
-            .putInt("unlocked_level", maxOf(current, level, 1))
+            .putInt("unlocked_level", maxOf(current, level.coerceIn(1, 100)))
             .apply()
     }
 

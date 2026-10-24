@@ -71,6 +71,7 @@ class MainActivity : Activity() {
     private var totalLevelArrows = 0
     private var awarded50PercentHeart = false
     private var awarded75PercentHeart = false
+    private var hintProcessing = false
 
     private val elapsedSeconds: Int
         get() = if (::gameController.isInitialized) (gameController.state.elapsedMillis / 1000L).toInt() else 0
@@ -135,10 +136,14 @@ class MainActivity : Activity() {
 
     private fun syncWithGameState(state: GameState) {
         if (!::statsLabel.isInitialized) return
+
         moves = state.moves
         lives = state.lives
-        hintsRemaining = state.hintsRemaining
         level = state.level
+
+        // Do not overwrite hintsRemaining here.
+        // MainActivity owns the free-hint count for the current level.
+
         updateTimerText()
         updateUI()
     }
@@ -383,7 +388,7 @@ class MainActivity : Activity() {
         stateListAnimator = null
         setOnTouchListener { v, event ->
             if (event.actionMasked == android.view.MotionEvent.ACTION_DOWN) {
-                v.performClick()
+                // Visual/audio feedback only. Do not invoke performClick() here.
                 GameEffects.tap(v, progress.reducedMotion)
                 GameAudio.playTap(progress.soundEnabled)
             }
@@ -402,6 +407,7 @@ class MainActivity : Activity() {
         paused = false
         gameOver = false
         finishingLevel = false
+        hintProcessing = false
         level = target.coerceAtLeast(1)
         hintsRemaining = 1
 
@@ -498,28 +504,25 @@ class MainActivity : Activity() {
     }
 
     private fun showHint() {
+        if (hintProcessing) return
         if (loading || paused || gameOver || finishingLevel) return
 
-        if (hintsRemaining > 0) {
-            val hintResult = PuzzleSolver.nextHint(board.puzzle)
-            if (hintResult == null) {
-                statusLabel.text = getString(R.string.no_solution_found)
-                statusLabel.setTextColor(GameTheme.RED)
-                return
-            }
+        hintProcessing = true
 
-            val arrow = board.puzzle.arrows.firstOrNull { it.id == hintResult.arrowId && it.active }
-            if (arrow == null) {
-                statusLabel.text = getString(R.string.no_solution_found)
-                statusLabel.setTextColor(GameTheme.RED)
-                return
+        fun findHintArrow(): Arrow? {
+            val hint = PuzzleSolver.nextHint(board.puzzle) ?: return null
+            return board.puzzle.arrows.firstOrNull {
+                it.id == hint.arrowId && it.active
             }
+        }
 
+        fun displayHint(arrow: Arrow, message: String) {
             hintsUsed++
-            hintsRemaining = 0
             board.showHint(arrow)
-            statusLabel.text = "💡 Free Hint Used! Clear arrow #${arrow.id} highlighted!"
+
+            statusLabel.text = message
             statusLabel.setTextColor(GameTheme.GOLD)
+
             if (!progress.reducedMotion) {
                 GameEffects.starSparkleBurst(hintButton)
             }
@@ -527,50 +530,109 @@ class MainActivity : Activity() {
             GameAudio.playHint(progress.soundEnabled)
             GameEffects.vibrate(this, progress.vibrationEnabled, 25)
             updateUI()
-        } else {
-            if (progress.totalStars < 5) {
-                Toast.makeText(
-                    this,
-                    "★ You need 5 stars to buy an extra hint! (You have ★ ${progress.totalStars})",
-                    Toast.LENGTH_SHORT
-                ).show()
+        }
+
+        // FREE HINT: no purchase dialog.
+        if (hintsRemaining > 0) {
+            val arrow = findHintArrow()
+
+            if (arrow == null) {
+                statusLabel.text = getString(R.string.no_solution_found)
+                statusLabel.setTextColor(GameTheme.RED)
+                hintProcessing = false
                 return
             }
 
-            AlertDialog.Builder(this)
-                .setTitle("💡 Buy Extra Hint?")
-                .setMessage("You have used your free hint for this level.\n\nExchange 5 Stars for an extra hint?")
-                .setPositiveButton("BUY HINT (★ 5)") { dialog, _ ->
-                    dialog.dismiss()
-                    if (gameController.spendStars(5)) {
-                        progress = storage.loadProgress()
-
-                        val hintResult = PuzzleSolver.nextHint(board.puzzle)
-                        if (hintResult == null) {
-                            statusLabel.text = getString(R.string.no_solution_found)
-                            statusLabel.setTextColor(GameTheme.RED)
-                            updateUI()
-                            return@setPositiveButton
-                        }
-
-                        val arrow = board.puzzle.arrows.firstOrNull { it.id == hintResult.arrowId && it.active }
-                        if (arrow != null) {
-                            hintsUsed++
-                            board.showHint(arrow)
-                            statusLabel.text = "💡 Extra Hint Used! Clear arrow #${arrow.id} highlighted!"
-                            statusLabel.setTextColor(GameTheme.GOLD)
-                            if (!progress.reducedMotion) {
-                                GameEffects.starSparkleBurst(hintButton)
-                            }
-                            GameAudio.playHint(progress.soundEnabled)
-                            GameEffects.vibrate(this, progress.vibrationEnabled, 25)
-                        }
-                        updateUI()
-                    }
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
+            hintsRemaining--
+            displayHint(arrow, "💡 Free hint: clear arrow #${arrow.id}!")
+            hintProcessing = false
+            return
         }
+
+        // PAID HINT: only this branch opens a dialog.
+        if (progress.totalStars < 5) {
+            Toast.makeText(
+                this,
+                "You need 5 stars for an extra hint.",
+                Toast.LENGTH_SHORT
+            ).show()
+            hintProcessing = false
+            return
+        }
+
+        // Do not charge for a hint that cannot be found.
+        if (findHintArrow() == null) {
+            statusLabel.text = getString(R.string.no_solution_found)
+            statusLabel.setTextColor(GameTheme.RED)
+            hintProcessing = false
+            return
+        }
+
+        val purchaseDialog = AlertDialog.Builder(this)
+            .setTitle("💡 Buy Extra Hint?")
+            .setMessage("Exchange exactly 5 stars for one extra hint?")
+            .setNegativeButton("CANCEL", null)
+            .setPositiveButton("BUY HINT (★ 5)", null)
+            .create()
+
+        purchaseDialog.setOnDismissListener {
+            hintProcessing = false
+        }
+
+        purchaseDialog.setOnShowListener {
+            purchaseDialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener {
+                    if (loading || paused || gameOver || finishingLevel) {
+                        purchaseDialog.dismiss()
+                        return@setOnClickListener
+                    }
+
+                    // Re-check immediately before charging.
+                    val arrow = findHintArrow()
+
+                    if (arrow == null) {
+                        purchaseDialog.dismiss()
+                        statusLabel.text = getString(R.string.no_solution_found)
+                        statusLabel.setTextColor(GameTheme.RED)
+                        return@setOnClickListener
+                    }
+
+                    if (progress.totalStars < 5) {
+                        purchaseDialog.dismiss()
+                        Toast.makeText(
+                            this,
+                            "Not enough stars.",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@setOnClickListener
+                    }
+
+                    // One charge of exactly 5 stars.
+                    val purchased = gameController.spendStars(5)
+
+                    if (!purchased) {
+                        progress = storage.loadProgress()
+                        updateUI()
+                        purchaseDialog.dismiss()
+                        return@setOnClickListener
+                    }
+
+                    // Read the authoritative balance after purchase.
+                    progress = storage.loadProgress().copy(
+                        totalStars = gameController.state.stars
+                    )
+
+                    // Close purchase dialog before displaying the hint.
+                    purchaseDialog.dismiss()
+
+                    displayHint(
+                        arrow,
+                        "💡 Extra hint: clear arrow #${arrow.id}!"
+                    )
+                }
+        }
+
+        purchaseDialog.show()
     }
 
     private fun togglePause() {
@@ -1903,7 +1965,11 @@ class MainActivity : Activity() {
         if (!::statsLabel.isInitialized) return
 
         levelLabel.text = getString(R.string.level_label_format, level)
-        val remaining = if (::board.isInitialized) board.puzzle.arrows.count { it.active && !board.isArrowAnimating(it) } else 0
+        val remaining = if (::board.isInitialized) {
+            board.puzzle.arrows.count { it.active }
+        } else {
+            0
+        }
         if (::movesStatLabel.isInitialized) movesStatLabel.text = getString(R.string.moves_stat_format, moves)
         if (::livesStatLabel.isInitialized) livesStatLabel.text = getString(R.string.lives_stat_format, "♥ ".repeat(lives.coerceIn(0, 3)).trim() + if (lives <= 0) "♡" else "")
         if (::arrowsStatLabel.isInitialized) arrowsStatLabel.text = getString(R.string.arrows_stat_format, remaining)
