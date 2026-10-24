@@ -42,6 +42,19 @@ class GameStorage(context: Context) {
             .apply()
     }
 
+    fun spendStars(cost: Int): Boolean {
+        if (cost <= 0) return false
+
+        val current = prefs.getInt("total_stars", 0)
+        if (current < cost) return false
+
+        prefs.edit()
+            .putInt("total_stars", current - cost)
+            .apply()
+
+        return true
+    }
+
     fun saveBestMoves(level: Int, moves: Int) {
         val key = "best_moves_$level"
         val old = prefs.getInt(key, Int.MAX_VALUE)

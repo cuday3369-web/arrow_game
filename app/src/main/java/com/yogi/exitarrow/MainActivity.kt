@@ -84,7 +84,7 @@ class MainActivity : Activity() {
         puzzleEngine = GamePuzzleEngine()
 
         progress = storage.loadProgress()
-        level = saveRepository.getUnlockedLevel()
+        level = progress.unlockedLevel
 
         api = ApiClient("http://10.171.52.13:8000")
 
@@ -310,8 +310,6 @@ class MainActivity : Activity() {
         }
         val timeStat = makeStat("⏱", "00:00", "TIME", GameTheme.GOLD)
         timerLabel = timeStat.second
-        val moveStat = makeStat("⇄", "0", "MOVES", GameTheme.CYAN)
-        movesStatLabel = moveStat.second
         val livesStat = makeStat("♥", "♥ ♥ ♥", "LIVES", GameTheme.RED)
         livesStatLabel = livesStat.second
         val arrowsStat = makeStat("➜", "0", "ARROWS LEFT", GameTheme.PURPLE)
@@ -319,9 +317,8 @@ class MainActivity : Activity() {
         statsLabel = GameTheme.text(this, "", 1f, GameTheme.MUTED).apply { visibility = View.GONE }
         val statParams = LinearLayout.LayoutParams(0, -2, 1f)
         statsPanel.addView(timeStat.first, statParams)
-        statsPanel.addView(moveStat.first, LinearLayout.LayoutParams(0, -2, 0.8f))
-        statsPanel.addView(livesStat.first, LinearLayout.LayoutParams(0, -2, 0.9f))
-        statsPanel.addView(arrowsStat.first, LinearLayout.LayoutParams(0, -2, 1f))
+        statsPanel.addView(livesStat.first, statParams)
+        statsPanel.addView(arrowsStat.first, statParams)
         contentContainer.addView(statsPanel, LinearLayout.LayoutParams(-1, -2))
 
         board = PuzzleBoardView(this)
@@ -607,20 +604,20 @@ class MainActivity : Activity() {
                         return@setOnClickListener
                     }
 
-                    // One charge of exactly 5 stars.
-                    val purchased = gameController.spendStars(5)
-
-                    if (!purchased) {
+                    // One charge of exactly 5 stars from storage.
+                    if (!storage.spendStars(5)) {
                         progress = storage.loadProgress()
                         updateUI()
                         purchaseDialog.dismiss()
+                        Toast.makeText(
+                            this,
+                            "Not enough stars for an extra hint.",
+                            Toast.LENGTH_SHORT
+                        ).show()
                         return@setOnClickListener
                     }
 
-                    // Read the authoritative balance after purchase.
-                    progress = storage.loadProgress().copy(
-                        totalStars = gameController.state.stars
-                    )
+                    progress = storage.loadProgress()
 
                     // Close purchase dialog before displaying the hint.
                     purchaseDialog.dismiss()
@@ -897,19 +894,21 @@ class MainActivity : Activity() {
         gameController.completeLevel()
 
         val completedLevel = level
-        val stars = when {
-            lives == 3 && hintsUsed == 0 -> 3
-            lives >= 2 -> 2
-            else -> 1
-        }
 
-        // Award once per level's best result. Replays do not farm duplicate stars.
-        val oldBestStars = storage.bestStars(completedLevel)
+        // Stars are determined by remaining hearts.
+        val stars = lives.coerceIn(1, 3)
+
         val oldStars = progress.totalStars
+
         storage.saveBestMoves(completedLevel, moves)
         storage.saveBestStars(completedLevel, stars)
-        if (stars > oldBestStars) storage.addStars(stars - oldBestStars)
+
+        // Add full reward for this completion, including replays.
+        storage.addStars(stars)
+
+        // Unlock next sequential level.
         storage.unlockLevel(completedLevel + 1)
+
         progress = storage.loadProgress()
 
         starsLabel.text = getString(R.string.stars_count_format, progress.totalStars)
@@ -931,7 +930,6 @@ class MainActivity : Activity() {
                 elapsedSeconds / 60,
                 elapsedSeconds % 60
             ),
-            movesUsed = moves,
             arrowsCleared = totalLevelArrows,
             onNextLevel = {
                 loadLevel(completedLevel + 1)
@@ -949,7 +947,6 @@ class MainActivity : Activity() {
         completedLevel: Int,
         stars: Int,
         timeTaken: String,
-        movesUsed: Int,
         arrowsCleared: Int,
         onNextLevel: () -> Unit,
         onLevelMap: () -> Unit,
@@ -1086,7 +1083,6 @@ class MainActivity : Activity() {
 
         val stats = TextView(this).apply {
             text = "TIME     $timeTaken\n" +
-                    "MOVES    $movesUsed\n" +
                     "ARROWS   $arrowsCleared"
             textSize = 15f
             gravity = Gravity.CENTER
