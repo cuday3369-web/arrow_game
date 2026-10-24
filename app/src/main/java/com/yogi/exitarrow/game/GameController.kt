@@ -110,7 +110,6 @@ class GameController(
 
         // Mark the arrow as removed only after a valid exit
         state = state.copy(
-            moves = state.moves + 1,
             arrows = state.arrows.map {
                 if (it.id == arrowId) it.copy(removed = true) else it
             }
@@ -177,7 +176,6 @@ class GameController(
         val additionalStars =
             (starsEarned - previousBestStars).coerceAtLeast(0)
 
-        saves.saveBestMoves(state.level, state.moves)
         saves.saveBestStars(state.level, starsEarned)
 
         if (additionalStars > 0) {

@@ -15,7 +15,6 @@
     <string name="wait_animation_prompt">Wait for the current animation to finish.</string>
     <string name="level_label_format">LEVEL %1$d</string>
     <string name="pause_button_label">Ⅱ PAUSE</string>
-    <string name="moves_stat_format">⇄ %1$d</string>
     <string name="game_resumed_prompt">Resumed. Find your next clear arrow.</string>
     <string name="lives_stat_format">%1$s</string>
     <string name="arrows_stat_format">➜ %1$d</string>

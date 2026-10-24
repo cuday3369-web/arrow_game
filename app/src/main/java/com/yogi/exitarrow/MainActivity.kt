@@ -40,7 +40,6 @@ class MainActivity : Activity() {
     private lateinit var levelLabel: TextView
     private lateinit var timerLabel: TextView
     private lateinit var statsLabel: TextView
-    private lateinit var movesStatLabel: TextView
     private lateinit var livesStatLabel: TextView
     private lateinit var arrowsStatLabel: TextView
     private lateinit var statusLabel: TextView
@@ -60,7 +59,6 @@ class MainActivity : Activity() {
 
     private var progress = GameProgress()
     private var level = 1
-    private var moves = 0
     private var lives = 3
     private var hintsRemaining = 3
     private var gameOver = false
@@ -137,7 +135,6 @@ class MainActivity : Activity() {
     private fun syncWithGameState(state: GameState) {
         if (!::statsLabel.isInitialized) return
 
-        moves = state.moves
         lives = state.lives
         level = state.level
 
@@ -900,7 +897,6 @@ class MainActivity : Activity() {
 
         val oldStars = progress.totalStars
 
-        storage.saveBestMoves(completedLevel, moves)
         storage.saveBestStars(completedLevel, stars)
 
         // Add full reward for this completion, including replays.
@@ -1966,7 +1962,6 @@ class MainActivity : Activity() {
         } else {
             0
         }
-        if (::movesStatLabel.isInitialized) movesStatLabel.text = getString(R.string.moves_stat_format, moves)
         if (::livesStatLabel.isInitialized) livesStatLabel.text = getString(R.string.lives_stat_format, "♥ ".repeat(lives.coerceIn(0, 3)).trim() + if (lives <= 0) "♡" else "")
         if (::arrowsStatLabel.isInitialized) arrowsStatLabel.text = getString(R.string.arrows_stat_format, remaining)
         updateTimerText()
