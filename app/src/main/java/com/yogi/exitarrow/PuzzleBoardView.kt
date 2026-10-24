@@ -92,7 +92,7 @@ class PuzzleBoardView(context: Context) : View(context) {
     fun isArrowAnimating(arrow: Arrow) = exits.containsKey(arrow)
 
     fun isClear(arrow: Arrow): Boolean =
-        arrow.active && !isArrowAnimating(arrow) && PuzzleSolver.isClear(puzzle, arrow) { isArrowAnimating(it) }
+        arrow.active && PuzzleSolver.isClear(puzzle, arrow)
 
     fun showHint(arrow: Arrow?) {
         hintedArrow = arrow
@@ -475,7 +475,7 @@ class PuzzleBoardView(context: Context) : View(context) {
 
                 if (row in 0 until puzzle.rows && col in 0 until puzzle.cols) {
                     val arrow = puzzle.arrows.firstOrNull {
-                        it.active && it.occupies(row, col) && !isArrowAnimating(it)
+                        it.active && it.occupies(row, col)
                     }
 
                     if (arrow != null) {

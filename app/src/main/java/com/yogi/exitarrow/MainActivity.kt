@@ -343,7 +343,7 @@ class MainActivity : Activity() {
             }
         }
         pauseButton = boxButton("Ⅱ  PAUSE", GameTheme.CYAN).apply { setOnClickListener { togglePause() } }
-        hintButton = boxButton("💡 HINT ($hintsRemaining)", GameTheme.GOLD).apply { setOnClickListener { showHint() } }
+        hintButton = boxButton("💡 HINT (FREE)", GameTheme.GOLD).apply { setOnClickListener { showHint() } }
         if (!progress.reducedMotion) GameEffects.organicBreathingGlow(hintButton, 0.92f, 1.0f, 1800L)
 
         val buttonParams = LinearLayout.LayoutParams(0, GameTheme.dp(this, 54), 1f)
@@ -403,6 +403,7 @@ class MainActivity : Activity() {
         gameOver = false
         finishingLevel = false
         level = target.coerceAtLeast(1)
+        hintsRemaining = 1
 
         updateTimerText()
 
@@ -453,7 +454,7 @@ class MainActivity : Activity() {
 
     private fun onArrowTapped(arrow: Arrow) {
         if (loading || paused || gameOver || finishingLevel) return
-        if (!arrow.active || board.isArrowAnimating(arrow)) return
+        if (!arrow.active) return
 
         if (!board.isClear(arrow)) {
             gameController.tapArrow(arrow.id.toString())
@@ -472,15 +473,17 @@ class MainActivity : Activity() {
         }
 
         gameController.tapArrow(arrow.id.toString())
+        arrow.active = false
 
         GameAudio.playArrowExit(progress.soundEnabled)
 
-        val remainingActive = board.puzzle.arrows.count { it.active && (it != arrow) && !board.isArrowAnimating(it) }
+        val remainingActive = board.puzzle.arrows.count { it.active }
 
         if (remainingActive == 0) {
             statusLabel.text = getString(R.string.level_completed_title, level)
             statusLabel.setTextColor(GameTheme.GOLD)
             GameAudio.playVictory(progress.soundEnabled)
+            completeLevel()
         } else {
             statusLabel.text = getString(R.string.nice_move)
             statusLabel.setTextColor(GameTheme.CYAN)
@@ -490,16 +493,6 @@ class MainActivity : Activity() {
 
         board.animateArrowOut(arrow) {
             if (isFinishing || isDestroyed) return@animateArrowOut
-
-            if (PuzzleSolver.isSolved(board.puzzle)) {
-                statusLabel.text = getString(R.string.level_completed_title, level)
-                statusLabel.setTextColor(GameTheme.GOLD)
-                completeLevel()
-            } else {
-                statusLabel.text = getString(R.string.next_arrow_prompt)
-                statusLabel.setTextColor(GameTheme.MUTED)
-            }
-
             updateUI()
         }
     }
@@ -508,24 +501,22 @@ class MainActivity : Activity() {
         if (loading || paused || gameOver || finishingLevel) return
 
         if (hintsRemaining > 0) {
-            val hintId = gameController.useHint()
-            if (hintId == null) {
+            val hintResult = PuzzleSolver.nextHint(board.puzzle)
+            if (hintResult == null) {
                 statusLabel.text = getString(R.string.no_solution_found)
                 statusLabel.setTextColor(GameTheme.RED)
                 return
             }
 
-            val intId = hintId.toIntOrNull()
-            val arrow = board.puzzle.arrows.firstOrNull {
-                it.id == intId && it.active && !board.isArrowAnimating(it)
-            }
-
-            if (arrow == null || !board.isClear(arrow)) {
-                statusLabel.text = getString(R.string.wait_animation_prompt)
+            val arrow = board.puzzle.arrows.firstOrNull { it.id == hintResult.arrowId && it.active }
+            if (arrow == null) {
+                statusLabel.text = getString(R.string.no_solution_found)
+                statusLabel.setTextColor(GameTheme.RED)
                 return
             }
 
             hintsUsed++
+            hintsRemaining = 0
             board.showHint(arrow)
             statusLabel.text = "💡 Free Hint Used! Clear arrow #${arrow.id} highlighted!"
             statusLabel.setTextColor(GameTheme.GOLD)
@@ -537,10 +528,10 @@ class MainActivity : Activity() {
             GameEffects.vibrate(this, progress.vibrationEnabled, 25)
             updateUI()
         } else {
-            if (progress.totalStars < 10) {
+            if (progress.totalStars < 5) {
                 Toast.makeText(
                     this,
-                    "★ You need 10 stars to buy an extra hint! (You have ★ ${progress.totalStars})",
+                    "★ You need 5 stars to buy an extra hint! (You have ★ ${progress.totalStars})",
                     Toast.LENGTH_SHORT
                 ).show()
                 return
@@ -548,24 +539,22 @@ class MainActivity : Activity() {
 
             AlertDialog.Builder(this)
                 .setTitle("💡 Buy Extra Hint?")
-                .setMessage("You have used your free hint for this level.\n\nExchange 10 Stars for an extra hint?")
-                .setPositiveButton("BUY HINT (★ 10)") { _, _ ->
-                    if (gameController.spendStars(10)) {
+                .setMessage("You have used your free hint for this level.\n\nExchange 5 Stars for an extra hint?")
+                .setPositiveButton("BUY HINT (★ 5)") { dialog, _ ->
+                    dialog.dismiss()
+                    if (gameController.spendStars(5)) {
                         progress = storage.loadProgress()
-                        val hintId = gameController.useExtraHint()
-                        if (hintId == null) {
+
+                        val hintResult = PuzzleSolver.nextHint(board.puzzle)
+                        if (hintResult == null) {
                             statusLabel.text = getString(R.string.no_solution_found)
                             statusLabel.setTextColor(GameTheme.RED)
                             updateUI()
                             return@setPositiveButton
                         }
 
-                        val intId = hintId.toIntOrNull()
-                        val arrow = board.puzzle.arrows.firstOrNull {
-                            it.id == intId && it.active && !board.isArrowAnimating(it)
-                        }
-
-                        if (arrow != null && board.isClear(arrow)) {
+                        val arrow = board.puzzle.arrows.firstOrNull { it.id == hintResult.arrowId && it.active }
+                        if (arrow != null) {
                             hintsUsed++
                             board.showHint(arrow)
                             statusLabel.text = "💡 Extra Hint Used! Clear arrow #${arrow.id} highlighted!"
@@ -1174,50 +1163,160 @@ class MainActivity : Activity() {
         gameOver = true
         paused = true
 
-        val builder = AlertDialog.Builder(this)
-            .setTitle("💔 Level $level Failed - Out of Hearts!")
-            .setMessage(
-                "⏱ Time taken: ${String.format(java.util.Locale.US, "%02d:%02d", elapsedSeconds / 60, elapsedSeconds % 60)}\n" +
-                        "🎯 Moves made: $moves\n" +
-                        "★ Your Stars: ★ ${progress.totalStars}\n\n" +
-                        if (progress.totalStars >= 10) {
-                            "You can exchange 10 stars for 1 Heart to continue, or restart the level."
-                        } else {
-                            "You ran out of hearts! Restart the level to try again."
-                        }
-            )
-            .setCancelable(false)
-            .setPositiveButton("↺ REPLAY LEVEL") { _, _ ->
-                loadLevel(level)
-            }
-            .setNeutralButton("🍭 LEVEL MAP") { _, _ ->
-                showCandyCrushLevelMapDialog()
+        val cyan = Color.rgb(0, 225, 255)
+        val navy = Color.rgb(3, 16, 39)
+        val panelColor = Color.rgb(5, 28, 59)
+        val white = Color.rgb(239, 247, 255)
+        val muted = Color.rgb(151, 207, 235)
+
+        fun dp(value: Int): Int =
+            (value * resources.displayMetrics.density).toInt()
+
+        fun roundedBackground(fill: Int, stroke: Int, radius: Int = 18) = GradientDrawable().apply {
+            setColor(fill)
+            cornerRadius = dp(radius).toFloat()
+            setStroke(dp(2), stroke)
+        }
+
+        val dialog = Dialog(this)
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
+        dialog.setCancelable(false)
+
+        val outer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(16), dp(14), dp(16), dp(14))
+            background = roundedBackground(navy, Color.rgb(255, 75, 65), 24)
+            clipChildren = false
+        }
+
+        val heading = TextView(this).apply {
+            text = "💔 OUT OF HEARTS!"
+            textSize = 22f
+            setTextColor(white)
+            typeface = Typeface.create("sans-serif", Typeface.BOLD_ITALIC)
+            gravity = Gravity.CENTER
+            setShadowLayer(dp(8).toFloat(), 0f, 0f, Color.rgb(255, 75, 65))
+        }
+
+        outer.addView(heading, LinearLayout.LayoutParams(-1, -2))
+
+        val subtitle = TextView(this).apply {
+            text = "LEVEL $level FAILED · STARS: ★ ${progress.totalStars}"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.rgb(255, 205, 55))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(6), 0, dp(12))
+        }
+
+        outer.addView(subtitle)
+
+        val optionsContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+        }
+
+        fun addOption(icon: String, title: String, description: String, onClick: () -> Unit) {
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(10), dp(10), dp(10), dp(10))
+                background = roundedBackground(panelColor, Color.rgb(20, 67, 115), 18)
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    dialog.dismiss()
+                    onClick()
+                }
             }
 
+            val iconView = TextView(this).apply {
+                text = icon
+                textSize = 22f
+                gravity = Gravity.CENTER
+                setTextColor(cyan)
+                background = roundedBackground(Color.rgb(4, 43, 83), Color.rgb(0, 106, 190), 14)
+            }
+
+            row.addView(iconView, LinearLayout.LayoutParams(dp(44), dp(44)))
+
+            val textColumn = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(12), 0, dp(6), 0)
+            }
+
+            val titleView = TextView(this).apply {
+                text = title
+                textSize = 15f
+                typeface = Typeface.DEFAULT_BOLD
+                setTextColor(white)
+            }
+
+            val descriptionView = TextView(this).apply {
+                text = description
+                textSize = 11f
+                setTextColor(muted)
+                setPadding(0, dp(2), 0, 0)
+            }
+
+            textColumn.addView(titleView)
+            textColumn.addView(descriptionView)
+
+            row.addView(textColumn, LinearLayout.LayoutParams(0, -2, 1f))
+
+            optionsContainer.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
+                bottomMargin = dp(8)
+            })
+        }
+
         if (progress.totalStars >= 10) {
-            builder.setNegativeButton("❤️ BUY 1 HEART (★ 10)") { _, _ ->
+            addOption("❤️", "Buy 1 Heart (★ 10)", "Exchange 10 stars to get 1 heart & continue") {
                 if (gameController.spendStars(10)) {
                     gameController.grantBonusLife()
                     progress = storage.loadProgress()
-                    starsLabel.text = getString(R.string.stars_count_format, progress.totalStars)
                     gameOver = false
                     paused = false
                     updateUI()
                     GameAudio.playVictory(progress.soundEnabled)
-                    Toast.makeText(
-                        this,
-                        "❤️ Purchased 1 Heart! (★ ${progress.totalStars} Stars left)",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    Toast.makeText(this, "❤️ Purchased 1 Heart!", Toast.LENGTH_SHORT).show()
                 }
-            }
-        } else if (level > 1) {
-            builder.setNegativeButton("PREVIOUS LEVEL (${level - 1})") { _, _ ->
-                loadLevel(level - 1)
             }
         }
 
-        builder.show()
+        addOption("↺", "Restart Level", "Restart level $level from beginning") {
+            loadLevel(level)
+        }
+
+        addOption("🗺️", "Level Map", "Return to level map screen") {
+            openLevelMapHome()
+        }
+
+        outer.addView(optionsContainer)
+
+        val scrollView = ScrollView(this).apply {
+            isFillViewport = true
+            clipToPadding = false
+            setPadding(dp(8), dp(8), dp(8), dp(8))
+            addView(outer, FrameLayout.LayoutParams(-1, -2))
+        }
+
+        val width = minOf((resources.displayMetrics.widthPixels * 0.88f).toInt(), dp(420))
+
+        val cardHolder = FrameLayout(this).apply {
+            setBackgroundColor(Color.argb(105, 245, 248, 255))
+            addView(scrollView, FrameLayout.LayoutParams(width, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
+        }
+
+        dialog.setContentView(cardHolder)
+        dialog.window?.apply {
+            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
+            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
+            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
+            setGravity(Gravity.CENTER)
+        }
+
+        dialog.show()
     }
 
     private fun showMenuDialog() {
@@ -1804,7 +1903,7 @@ class MainActivity : Activity() {
         if (!::statsLabel.isInitialized) return
 
         levelLabel.text = getString(R.string.level_label_format, level)
-        val remaining = if (::board.isInitialized) board.puzzle.arrows.count { it.active } else 0
+        val remaining = if (::board.isInitialized) board.puzzle.arrows.count { it.active && !board.isArrowAnimating(it) } else 0
         if (::movesStatLabel.isInitialized) movesStatLabel.text = getString(R.string.moves_stat_format, moves)
         if (::livesStatLabel.isInitialized) livesStatLabel.text = getString(R.string.lives_stat_format, "♥ ".repeat(lives.coerceIn(0, 3)).trim() + if (lives <= 0) "♡" else "")
         if (::arrowsStatLabel.isInitialized) arrowsStatLabel.text = getString(R.string.arrows_stat_format, remaining)
@@ -1812,8 +1911,9 @@ class MainActivity : Activity() {
 
         pauseButton.text = if (paused) "▶ RESUME" else "Ⅱ PAUSE"
         pauseButton.isEnabled = !loading && !finishingLevel && !gameOver
-        hintButton.text = getString(R.string.hint_button_format, hintsRemaining)
-        hintButton.isEnabled = !loading && !paused && !gameOver && !finishingLevel && hintsRemaining > 0
+        hintButton.text = if (hintsRemaining > 0) "💡 HINT (FREE)" else "💡 HINT (★ 5)"
+        hintButton.textSize = 13.5f
+        hintButton.isEnabled = !loading && !paused && !gameOver && !finishingLevel
         starsLabel.text = getString(R.string.stars_count_format, progress.totalStars)
     }
 
