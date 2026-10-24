@@ -16,8 +16,8 @@ import kotlin.math.min
 class CandyCrushLevelMapView(
     context: Context,
     private val totalLevels: Int = 100,
-    private val unlockedLevel: Int,
-    private val currentLevel: Int,
+    private var unlockedLevel: Int,
+    private var currentLevel: Int,
     private val getBestStars: (Int) -> Int,
     private val onLevelSelected: (Int) -> Unit,
     private val onLockedLevelTapped: ((Int) -> Unit)? = null
@@ -52,6 +52,15 @@ class CandyCrushLevelMapView(
     private var maxTabScrollX = 0f
     private var tabLastTouchX = 0f
     private var isTabDragging = false
+
+    fun updateProgress(
+        unlockedLevel: Int,
+        currentLevel: Int
+    ) {
+        this.unlockedLevel = unlockedLevel.coerceIn(1, totalLevels)
+        this.currentLevel = currentLevel.coerceIn(1, totalLevels)
+        invalidate()
+    }
 
     private val dp: (Float) -> Float = { it * density }
 

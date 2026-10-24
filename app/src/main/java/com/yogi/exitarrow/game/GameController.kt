@@ -158,34 +158,10 @@ class GameController(
 
         stopTimer()
 
-        val initialHints = when {
-            state.level <= 20 -> 3
-            state.level <= 50 -> 2
-            else -> 1
-        }
-
-        val noHintsUsed = state.hintsRemaining == initialHints
-
-        val starsEarned = when {
-            state.lives == 3 && noHintsUsed -> 3
-            state.lives >= 2 -> 2
-            else -> 1
-        }
-
-        val previousBestStars = saves.bestStars(state.level)
-        val additionalStars =
-            (starsEarned - previousBestStars).coerceAtLeast(0)
-
-        saves.saveBestStars(state.level, starsEarned)
-
-        if (additionalStars > 0) {
-            saves.addStars(additionalStars)
-        }
-
+        // MainActivity is the single owner of completion rewards.
+        // Do not add stars or unlock levels here.
         totalStars = saves.getStars()
-
         unlockedLevel = maxOf(unlockedLevel, state.level + 1)
-        saves.unlockLevel(unlockedLevel)
 
         state = state.copy(
             phase = GamePhase.WON,

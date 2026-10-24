@@ -55,15 +55,6 @@ class GameStorage(context: Context) {
         return true
     }
 
-    fun saveBestMoves(level: Int, moves: Int) {
-        val key = "best_moves_$level"
-        val old = prefs.getInt(key, Int.MAX_VALUE)
-        if (moves < old) prefs.edit().putInt(key, moves).apply()
-    }
-
-    fun bestMoves(level: Int): Int =
-        prefs.getInt("best_moves_$level", -1)
-
     fun saveBestStars(level: Int, stars: Int) {
         val key = "best_stars_$level"
         val old = prefs.getInt(key, 0)

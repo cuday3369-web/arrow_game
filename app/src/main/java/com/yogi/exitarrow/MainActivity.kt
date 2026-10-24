@@ -102,20 +102,38 @@ class MainActivity : Activity() {
     }
 
     fun openLevelMapHome() {
+        // Read the latest saved progress every time the map opens.
+        progress = storage.loadProgress()
+        level = progress.unlockedLevel
+
         finishingLevel = false
         loading = false
         paused = true
+
         if (::exitLevelBtn.isInitialized) {
             exitLevelBtn.visibility = View.INVISIBLE
         }
+
         if (::homeMapView.isInitialized) {
-            homeMapView.invalidate()
+            homeMapView.updateProgress(
+                unlockedLevel = progress.unlockedLevel,
+                currentLevel = level
+            )
         }
+
         if (::mapContainer.isInitialized) {
             mapContainer.visibility = View.VISIBLE
         }
+
         if (::contentContainer.isInitialized) {
             contentContainer.visibility = View.GONE
+        }
+
+        if (::starsLabel.isInitialized) {
+            starsLabel.text = getString(
+                R.string.stars_count_format,
+                progress.totalStars
+            )
         }
     }
 
@@ -505,8 +523,12 @@ class MainActivity : Activity() {
 
         fun findHintArrow(): Arrow? {
             val hint = PuzzleSolver.nextHint(board.puzzle) ?: return null
-            return board.puzzle.arrows.firstOrNull {
-                it.id == hint.arrowId && it.active
+
+            return board.puzzle.arrows.firstOrNull { arrow ->
+                arrow.id == hint.arrowId &&
+                    arrow.active &&
+                    !board.isArrowAnimating(arrow) &&
+                    board.isClear(arrow)
             }
         }
 
@@ -888,29 +910,51 @@ class MainActivity : Activity() {
 
         finishingLevel = true
         paused = true
+
+        val completedLevel = level.coerceIn(1, 100)
+
+        // Stars depend only on hearts remaining.
+        val stars = lives.coerceIn(0, 3)
+
+        val oldStars = storage.loadProgress().totalStars
+
+        // Move the controller to WON state. It must not award stars.
         gameController.completeLevel()
 
-        val completedLevel = level
-
-        // Stars are determined by remaining hearts.
-        val stars = lives.coerceIn(1, 3)
-
-        val oldStars = progress.totalStars
-
+        // Update the best result without limiting replay rewards.
         storage.saveBestStars(completedLevel, stars)
 
-        // Add full reward for this completion, including replays.
-        storage.addStars(stars)
+        // Award exactly the earned amount for this completion.
+        if (stars > 0) {
+            storage.addStars(stars)
+        }
 
-        // Unlock next sequential level.
-        storage.unlockLevel(completedLevel + 1)
+        // Unlock the next level, capped at the final level.
+        storage.unlockLevel((completedLevel + 1).coerceAtMost(100))
 
         progress = storage.loadProgress()
 
-        starsLabel.text = getString(R.string.stars_count_format, progress.totalStars)
+        starsLabel.text = getString(
+            R.string.stars_count_format,
+            progress.totalStars
+        )
+
         if (!progress.reducedMotion) {
-            GameEffects.numberTicker(starsLabel, oldStars, progress.totalStars, prefix = "★ ")
+            GameEffects.numberTicker(
+                starsLabel,
+                oldStars,
+                progress.totalStars,
+                prefix = "★ "
+            )
             GameEffects.starSparkleBurst(starsLabel)
+        }
+
+        // Update the existing map with the new unlock limit.
+        if (::homeMapView.isInitialized) {
+            homeMapView.updateProgress(
+                unlockedLevel = progress.unlockedLevel,
+                currentLevel = completedLevel + 1
+            )
         }
 
         confettiOverlay.start()
@@ -928,7 +972,7 @@ class MainActivity : Activity() {
             ),
             arrowsCleared = totalLevelArrows,
             onNextLevel = {
-                loadLevel(completedLevel + 1)
+                loadLevel((completedLevel + 1).coerceAtMost(100))
             },
             onLevelMap = {
                 openLevelMapHome()
