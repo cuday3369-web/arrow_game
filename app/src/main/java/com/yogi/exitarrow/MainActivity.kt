@@ -60,7 +60,7 @@ class MainActivity : Activity() {
     private var progress = GameProgress()
     private var level = 1
     private var lives = 3
-    private var hintsRemaining = 3
+    private var hintsRemaining = 1
     private var gameOver = false
     private var paused = false
     private var loading = false
@@ -421,7 +421,6 @@ class MainActivity : Activity() {
         finishingLevel = false
         hintProcessing = false
         level = target.coerceAtLeast(1)
-        hintsRemaining = 1
 
         updateTimerText()
 
@@ -638,7 +637,13 @@ class MainActivity : Activity() {
 
                     progress = storage.loadProgress()
 
-                    // Close purchase dialog before displaying the hint.
+                    starsLabel.text = getString(
+                        R.string.stars_count_format,
+                        progress.totalStars
+                    )
+
+                    updateUI()
+
                     purchaseDialog.dismiss()
 
                     displayHint(
@@ -911,33 +916,28 @@ class MainActivity : Activity() {
         finishingLevel = true
         paused = true
 
-        val completedLevel = level.coerceIn(1, 100)
+        val completedLevel = level
 
-        // Stars depend only on hearts remaining.
+        // Completion reward depends on hearts remaining.
         val stars = lives.coerceIn(0, 3)
 
         val oldStars = storage.loadProgress().totalStars
 
-        // Move the controller to WON state. It must not award stars.
+        // Set the controller's WON state. It must not award stars itself.
         gameController.completeLevel()
 
-        // Update the best result without limiting replay rewards.
+        // Save the level result separately from the player's currency.
         storage.saveBestStars(completedLevel, stars)
 
-        // Award exactly the earned amount for this completion.
-        if (stars > 0) {
-            storage.addStars(stars)
-        }
+        // Add the full reward for this completion exactly once.
+        storage.addStars(stars)
 
-        // Unlock the next level, capped at the final level.
         storage.unlockLevel((completedLevel + 1).coerceAtMost(100))
 
+        // Always reload the balance from persistent storage.
         progress = storage.loadProgress()
 
-        starsLabel.text = getString(
-            R.string.stars_count_format,
-            progress.totalStars
-        )
+        starsLabel.text = "★ ${progress.totalStars}"
 
         if (!progress.reducedMotion) {
             GameEffects.numberTicker(

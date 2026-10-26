@@ -158,15 +158,15 @@ class GameController(
 
         stopTimer()
 
-        // MainActivity is the single owner of completion rewards.
-        // Do not add stars or unlock levels here.
+        // Do not award stars or unlock levels here.
+        // MainActivity handles the completion screen.
         totalStars = saves.getStars()
-        unlockedLevel = maxOf(unlockedLevel, state.level + 1)
+        unlockedLevel = saves.getUnlockedLevel()
 
         state = state.copy(
             phase = GamePhase.WON,
             stars = totalStars,
-            rewardedLevels = state.rewardedLevels + state.level,
+            rewardedLevels = state.rewardedLevels + state.level
         )
 
         persist()
