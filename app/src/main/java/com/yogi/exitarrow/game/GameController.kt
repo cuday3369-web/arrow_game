@@ -41,6 +41,7 @@ class GameController(
         handler.removeCallbacks(timer)
         active = false
 
+        totalStars = saves.getStars()
         val safeLevel = level.coerceAtLeast(1)
         val arrows = engine.createLevel(safeLevel)
 
@@ -260,6 +261,7 @@ class GameController(
     }
 
     private fun persist() {
+        totalStars = saves.getStars()
         saves.saveProgress(
             currentLevel = state.level,
             unlockedLevel = unlockedLevel,
@@ -272,6 +274,7 @@ class GameController(
     }
 
     private fun saveSettings() {
+        totalStars = saves.getStars()
         saves.saveProgress(
             currentLevel = state.level,
             unlockedLevel = unlockedLevel,

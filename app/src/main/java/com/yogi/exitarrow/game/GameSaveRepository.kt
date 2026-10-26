@@ -92,7 +92,7 @@ class GameSaveRepository(context: Context) {
 
     fun getCurrentLevel() = prefs.getInt("current_level", 1).coerceAtLeast(1)
     fun getUnlockedLevel() = prefs.getInt("unlocked_level", 1).coerceAtLeast(1)
-    fun getStars() = prefs.getInt("total_stars", 0).coerceAtLeast(0)
+    fun getStars() = prefs.getInt("total_stars", 100).coerceAtLeast(0)
 
     fun isSoundEnabled() = prefs.getBoolean("sound_enabled", true)
     fun isVibrationEnabled() = prefs.getBoolean("vibration_enabled", true)
