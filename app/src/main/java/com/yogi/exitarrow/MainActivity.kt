@@ -15,7 +15,6 @@ import android.view.WindowInsets
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Switch
@@ -54,6 +53,7 @@ class MainActivity : Activity() {
     private lateinit var gameController: GameController
     private lateinit var saveRepository: GameSaveRepository
     private lateinit var puzzleEngine: GamePuzzleEngine
+    private lateinit var hintManager: HintManager
 
     private val executor = Executors.newSingleThreadExecutor()
 
@@ -97,18 +97,58 @@ class MainActivity : Activity() {
         )
 
         buildUI()
+
+        hintManager = HintManager(
+            activity = this,
+            board = board,
+            storage = storage,
+            getProgress = { progress },
+            setProgress = { progress = it },
+            getHintsRemaining = { hintsRemaining },
+            setHintsRemaining = { hintsRemaining = it },
+            getHintProcessing = { hintProcessing },
+            setHintProcessing = { hintProcessing = it },
+            isGameBusy = {
+                loading || paused || gameOver || finishingLevel
+            },
+            statusLabel = statusLabel,
+            starsLabel = starsLabel,
+            hintButton = hintButton,
+            updateUI = ::updateUI,
+            onHintUsed = { hintsUsed++ }
+        )
+
         board.onArrowTapped = ::onArrowTapped
         openLevelMapHome()
+        showExitArrowIntro()
+    }
+
+    private fun showExitArrowIntro() {
+        val intro = ExitArrowIntroView(this) {
+            runOnUiThread {
+                val overlay = frameRoot.findViewWithTag<View>("exit_arrow_intro")
+                if (overlay != null) frameRoot.removeView(overlay)
+            }
+        }
+        intro.tag = "exit_arrow_intro"
+        frameRoot.addView(
+            intro,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        intro.start()
     }
 
     fun openLevelMapHome() {
-        // Read the latest saved progress every time the map opens.
         progress = storage.loadProgress()
-        level = progress.unlockedLevel
 
         finishingLevel = false
         loading = false
         paused = true
+
+        val activeMapLevel = level.coerceIn(1, progress.unlockedLevel)
 
         if (::exitLevelBtn.isInitialized) {
             exitLevelBtn.visibility = View.INVISIBLE
@@ -117,7 +157,7 @@ class MainActivity : Activity() {
         if (::homeMapView.isInitialized) {
             homeMapView.updateProgress(
                 unlockedLevel = progress.unlockedLevel,
-                currentLevel = level
+                currentLevel = activeMapLevel
             )
         }
 
@@ -359,7 +399,7 @@ class MainActivity : Activity() {
                 setStroke(GameTheme.dp(this@MainActivity, 1), Color.rgb(24, 54, 103))
             }
         }
-        pauseButton = boxButton("Ⅱ  PAUSE", GameTheme.CYAN).apply { setOnClickListener { togglePause() } }
+        pauseButton = boxButton("Ⅱ PAUSE", GameTheme.CYAN).apply { setOnClickListener { togglePause() } }
         hintButton = boxButton("💡 HINT (FREE)", GameTheme.GOLD).apply { setOnClickListener { showHint() } }
         if (!progress.reducedMotion) GameEffects.organicBreathingGlow(hintButton, 0.92f, 1.0f, 1800L)
 
@@ -515,145 +555,7 @@ class MainActivity : Activity() {
     }
 
     private fun showHint() {
-        if (hintProcessing) return
-        if (loading || paused || gameOver || finishingLevel) return
-
-        hintProcessing = true
-
-        fun findHintArrow(): Arrow? {
-            val hint = PuzzleSolver.nextHint(board.puzzle) ?: return null
-
-            return board.puzzle.arrows.firstOrNull { arrow ->
-                arrow.id == hint.arrowId &&
-                    arrow.active &&
-                    !board.isArrowAnimating(arrow) &&
-                    board.isClear(arrow)
-            }
-        }
-
-        fun displayHint(arrow: Arrow, message: String) {
-            hintsUsed++
-            board.showHint(arrow)
-
-            statusLabel.text = message
-            statusLabel.setTextColor(GameTheme.GOLD)
-
-            if (!progress.reducedMotion) {
-                GameEffects.starSparkleBurst(hintButton)
-            }
-
-            GameAudio.playHint(progress.soundEnabled)
-            GameEffects.vibrate(this, progress.vibrationEnabled, 25)
-            updateUI()
-        }
-
-        // FREE HINT: no purchase dialog.
-        if (hintsRemaining > 0) {
-            val arrow = findHintArrow()
-
-            if (arrow == null) {
-                statusLabel.text = getString(R.string.no_solution_found)
-                statusLabel.setTextColor(GameTheme.RED)
-                hintProcessing = false
-                return
-            }
-
-            hintsRemaining--
-            displayHint(arrow, "💡 Free hint: clear arrow #${arrow.id}!")
-            hintProcessing = false
-            return
-        }
-
-        // PAID HINT: only this branch opens a dialog.
-        if (progress.totalStars < 5) {
-            Toast.makeText(
-                this,
-                "You need 5 stars for an extra hint.",
-                Toast.LENGTH_SHORT
-            ).show()
-            hintProcessing = false
-            return
-        }
-
-        // Do not charge for a hint that cannot be found.
-        if (findHintArrow() == null) {
-            statusLabel.text = getString(R.string.no_solution_found)
-            statusLabel.setTextColor(GameTheme.RED)
-            hintProcessing = false
-            return
-        }
-
-        val purchaseDialog = AlertDialog.Builder(this)
-            .setTitle("💡 Buy Extra Hint?")
-            .setMessage("Exchange exactly 5 stars for one extra hint?")
-            .setNegativeButton("CANCEL", null)
-            .setPositiveButton("BUY HINT (★ 5)", null)
-            .create()
-
-        purchaseDialog.setOnDismissListener {
-            hintProcessing = false
-        }
-
-        purchaseDialog.setOnShowListener {
-            purchaseDialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener {
-                    if (loading || paused || gameOver || finishingLevel) {
-                        purchaseDialog.dismiss()
-                        return@setOnClickListener
-                    }
-
-                    // Re-check immediately before charging.
-                    val arrow = findHintArrow()
-
-                    if (arrow == null) {
-                        purchaseDialog.dismiss()
-                        statusLabel.text = getString(R.string.no_solution_found)
-                        statusLabel.setTextColor(GameTheme.RED)
-                        return@setOnClickListener
-                    }
-
-                    if (progress.totalStars < 5) {
-                        purchaseDialog.dismiss()
-                        Toast.makeText(
-                            this,
-                            "Not enough stars.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@setOnClickListener
-                    }
-
-                    // One charge of exactly 5 stars from storage.
-                    if (!storage.spendStars(5)) {
-                        progress = storage.loadProgress()
-                        updateUI()
-                        purchaseDialog.dismiss()
-                        Toast.makeText(
-                            this,
-                            "Not enough stars for an extra hint.",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                        return@setOnClickListener
-                    }
-
-                    progress = storage.loadProgress()
-
-                    starsLabel.text = getString(
-                        R.string.stars_count_format,
-                        progress.totalStars
-                    )
-
-                    updateUI()
-
-                    purchaseDialog.dismiss()
-
-                    displayHint(
-                        arrow,
-                        "💡 Extra hint: clear arrow #${arrow.id}!"
-                    )
-                }
-        }
-
-        purchaseDialog.show()
+        hintManager.showHint()
     }
 
     private fun togglePause() {
@@ -671,275 +573,58 @@ class MainActivity : Activity() {
         paused = true
         gameController.pause()
 
-        val cyan = Color.rgb(0, 225, 255)
-        val navy = Color.rgb(3, 16, 39)
-        val panelColor = Color.rgb(5, 28, 59)
-        val white = Color.rgb(239, 247, 255)
-        val muted = Color.rgb(151, 207, 235)
-
-        fun dp(value: Int): Int =
-            (value * resources.displayMetrics.density).toInt()
-
-        fun roundedBackground(
-            fill: Int,
-            stroke: Int,
-            radius: Int = 18
-        ) = GradientDrawable().apply {
-            setColor(fill)
-            cornerRadius = dp(radius).toFloat()
-            setStroke(dp(2), stroke)
-        }
-
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-
-        val outer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = roundedBackground(navy, cyan, 24)
-            clipChildren = false
-        }
-
-        val headingRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-
-        val heading = TextView(this).apply {
-            text = "GAME PAUSED"
-            textSize = 24f
-            setTextColor(white)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD_ITALIC)
-            gravity = Gravity.CENTER
-            setShadowLayer(dp(8).toFloat(), 0f, 0f, cyan)
-        }
-
-        headingRow.addView(
-            heading,
-            LinearLayout.LayoutParams(0, dp(44), 1f)
-        )
-
-        val closeButton = TextView(this).apply {
-            text = "✕"
-            textSize = 20f
-            setTextColor(white)
-            gravity = Gravity.CENTER
-            background = roundedBackground(panelColor, cyan, 50)
-            contentDescription = "Resume game"
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                dialog.dismiss()
+        PauseDialog(
+            activity = this,
+            level = level,
+            onResume = {
                 paused = false
                 gameController.resume()
                 pauseButton.text = getString(R.string.pause_button_label)
                 statusLabel.text = getString(R.string.game_resumed_prompt)
                 updateUI()
+            },
+            onRestart = {
+                loadLevel(level)
+            },
+            onLevelMap = {
+                openLevelMapHome()
             }
-        }
-
-        headingRow.addView(
-            closeButton,
-            LinearLayout.LayoutParams(dp(40), dp(40))
-        )
-
-        outer.addView(
-            headingRow,
-            LinearLayout.LayoutParams(-1, -2)
-        )
-
-        val subtitle = TextView(this).apply {
-            text = "PAUSED · PROGRESS SAVED"
-            textSize = 11f
-            letterSpacing = 0.12f
-            setTextColor(muted)
-            gravity = Gravity.CENTER
-            setPadding(0, dp(2), 0, dp(10))
-        }
-
-        outer.addView(subtitle)
-
-        val optionsContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        fun addPauseOption(
-            icon: String,
-            title: String,
-            description: String,
-            onClick: () -> Unit
-        ) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10), dp(10), dp(10), dp(10))
-                background = roundedBackground(panelColor, Color.rgb(20, 67, 115), 18)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    dialog.dismiss()
-                    onClick()
-                }
-            }
-
-            val iconView = TextView(this).apply {
-                text = icon
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setTextColor(cyan)
-                background = roundedBackground(
-                    Color.rgb(4, 43, 83),
-                    Color.rgb(0, 106, 190),
-                    14
-                )
-            }
-
-            row.addView(
-                iconView,
-                LinearLayout.LayoutParams(dp(44), dp(44))
-            )
-
-            val textColumn = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), 0, dp(6), 0)
-            }
-
-            val titleView = TextView(this).apply {
-                text = title
-                textSize = 15f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(white)
-            }
-
-            val descriptionView = TextView(this).apply {
-                text = description
-                textSize = 11f
-                setTextColor(muted)
-                setPadding(0, dp(2), 0, 0)
-            }
-
-            textColumn.addView(titleView)
-            textColumn.addView(descriptionView)
-
-            row.addView(
-                textColumn,
-                LinearLayout.LayoutParams(0, -2, 1f)
-            )
-
-            optionsContainer.addView(
-                row,
-                LinearLayout.LayoutParams(-1, -2).apply {
-                    bottomMargin = dp(8)
-                }
-            )
-        }
-
-        addPauseOption(
-            "▶",
-            "Resume Game",
-            "Continue playing level $level"
-        ) {
-            paused = false
-            gameController.resume()
-            pauseButton.text = getString(R.string.pause_button_label)
-            statusLabel.text = getString(R.string.game_resumed_prompt)
-            updateUI()
-        }
-
-        addPauseOption(
-            "↺",
-            "Restart Level",
-            "Restart level $level from beginning"
-        ) {
-            loadLevel(level)
-        }
-
-        addPauseOption(
-            "🗺️",
-            "Level Map",
-            "Return to level map screen"
-        ) {
-            openLevelMapHome()
-        }
-
-        outer.addView(optionsContainer)
-
-        val scrollView = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            addView(
-                outer,
-                FrameLayout.LayoutParams(-1, -2)
-            )
-        }
-
-        val width = minOf(
-            (resources.displayMetrics.widthPixels * 0.88f).toInt(),
-            dp(420)
-        )
-
-        val cardHolder = FrameLayout(this).apply {
-            setBackgroundColor(Color.argb(105, 245, 248, 255))
-            addView(
-                scrollView,
-                FrameLayout.LayoutParams(width, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER)
-            )
-            setOnClickListener {
-                dialog.dismiss()
-                paused = false
-                gameController.resume()
-                pauseButton.text = getString(R.string.pause_button_label)
-                statusLabel.text = getString(R.string.game_resumed_prompt)
-                updateUI()
-            }
-        }
-        outer.setOnClickListener { }
-
-        dialog.setContentView(cardHolder)
-
-        dialog.window?.apply {
-            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-            setGravity(Gravity.CENTER)
-        }
-
-        dialog.show()
+        ).show()
     }
 
     private fun completeLevel() {
+        // Guard against repeated callbacks from the final arrow animation.
         if (finishingLevel || gameOver || isFinishing || isDestroyed) return
 
         finishingLevel = true
         paused = true
 
-        val completedLevel = level
-
-        // Completion reward depends on hearts remaining.
-        val stars = lives.coerceIn(0, 3)
-
+        val completedLevel = level.coerceIn(1, 100)
+        val starsEarned = lives.coerceIn(0, 3)
         val oldStars = storage.loadProgress().totalStars
 
-        // Set the controller's WON state. It must not award stars itself.
+        // Stop the gameplay controller from accepting more input.
         gameController.completeLevel()
 
-        // Save the level result separately from the player's currency.
-        storage.saveBestStars(completedLevel, stars)
+        // Record result, first-clear reward, best stars, and next unlock together.
+        val completion = storage.recordLevelCompletion(
+            level = completedLevel,
+            stars = starsEarned
+        )
 
-        // Add the full reward for this completion exactly once.
-        storage.addStars(stars)
-
-        storage.unlockLevel((completedLevel + 1).coerceAtMost(100))
-
-        // Always reload the balance from persistent storage.
+        // Keep the UI in sync with persistent storage.
         progress = storage.loadProgress()
 
-        starsLabel.text = "★ ${progress.totalStars}"
+        // Aim for the next unlocked level after completion.
+        val nextLevel = (completedLevel + 1).coerceAtMost(100)
+        level = nextLevel
 
-        if (!progress.reducedMotion) {
+        starsLabel.text = getString(
+            R.string.stars_count_format,
+            progress.totalStars
+        )
+
+        if (!progress.reducedMotion && completion.starsAwarded > 0) {
             GameEffects.numberTicker(
                 starsLabel,
                 oldStars,
@@ -949,11 +634,11 @@ class MainActivity : Activity() {
             GameEffects.starSparkleBurst(starsLabel)
         }
 
-        // Update the existing map with the new unlock limit.
+        // Update the map with the true saved unlock limit. Highlight the next level.
         if (::homeMapView.isInitialized) {
             homeMapView.updateProgress(
                 unlockedLevel = progress.unlockedLevel,
-                currentLevel = completedLevel + 1
+                currentLevel = nextLevel
             )
         }
 
@@ -961,9 +646,15 @@ class MainActivity : Activity() {
         GameAudio.playVictory(progress.soundEnabled)
         GameEffects.vibrate(this, progress.vibrationEnabled, 80)
 
-        showResponsiveLevelComplete(
+        val rewardMessage = if (completion.firstCompletion) {
+            "First clear! +${completion.starsAwarded} stars"
+        } else {
+            "Level replayed · no duplicate completion reward"
+        }
+
+        LevelCompleteDialog(this).show(
             completedLevel = completedLevel,
-            stars = stars,
+            stars = completion.bestStars,
             timeTaken = String.format(
                 java.util.Locale.US,
                 "%02d:%02d",
@@ -981,242 +672,9 @@ class MainActivity : Activity() {
                 loadLevel(completedLevel)
             }
         )
-    }
 
-    private fun showResponsiveLevelComplete(
-        completedLevel: Int,
-        stars: Int,
-        timeTaken: String,
-        arrowsCleared: Int,
-        onNextLevel: () -> Unit,
-        onLevelMap: () -> Unit,
-        onReplay: () -> Unit
-    ) {
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setCancelable(false)
-
-        val density = resources.displayMetrics.density
-        fun dp(value: Int) = (value * density).toInt()
-
-        fun rounded(
-            color: Int,
-            radiusDp: Int,
-            strokeColor: Int = Color.TRANSPARENT
-        ) = GradientDrawable().apply {
-            setColor(color)
-            cornerRadius = dp(radiusDp).toFloat()
-            if (strokeColor != Color.TRANSPARENT) {
-                setStroke(dp(2), strokeColor)
-            }
-        }
-
-        // Full-window root. Draw behind system bars so the overlay
-        // covers the app window, including notched-screen areas.
-        val screenRoot = FrameLayout(this).apply {
-            setBackgroundColor(Color.TRANSPARENT)
-            fitsSystemWindows = false
-            @Suppress("DEPRECATION")
-            systemUiVisibility =
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE or
-                        View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN or
-                        View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-        }
-
-        // Semi-transparent white mask.
-        val overlay = View(this).apply {
-            setBackgroundColor(Color.argb(105, 245, 248, 255))
-            isClickable = true
-            isFocusable = true
-        }
-
-        screenRoot.addView(
-            overlay,
-            FrameLayout.LayoutParams(-1, -1)
-        )
-
-        // Panel is exactly 80% width and 70% height of current display dimensions (+5% top and bottom).
-        val metrics = resources.displayMetrics
-        val panelWidth = (metrics.widthPixels * 0.80f).toInt()
-        val panelHeight = (metrics.heightPixels * 0.70f).toInt()
-
-        val panel = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(14), dp(14), dp(14), dp(14))
-            background = rounded(
-                Color.rgb(4, 20, 48),
-                22,
-                Color.rgb(0, 210, 255)
-            )
-            elevation = dp(12).toFloat()
-        }
-
-        val title = TextView(this).apply {
-            text = getString(R.string.level_completed_title, completedLevel)
-            textSize = 22f
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.WHITE)
-            setShadowLayer(dp(8).toFloat(), 0f, 0f, Color.CYAN)
-        }
-
-        panel.addView(
-            title,
-            LinearLayout.LayoutParams(-1, 0, 1.0f)
-        )
-
-        val levelText = TextView(this).apply {
-            text = getString(R.string.level_label_format, completedLevel)
-            textSize = 24f
-            gravity = Gravity.CENTER
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.rgb(255, 210, 55))
-        }
-
-        panel.addView(
-            levelText,
-            LinearLayout.LayoutParams(-1, 0, 0.8f)
-        )
-
-        // Reuse the existing drawable assets.
-        val banner = ImageView(this).apply {
-            setImageResource(R.drawable.banner)
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            adjustViewBounds = true
-            contentDescription = "Level completed banner"
-        }
-
-        panel.addView(
-            banner,
-            LinearLayout.LayoutParams(-1, 0, 1.7f)
-        )
-
-        val starRow = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-
-        val starSize = dp(44)
-        val starMargin = dp(6)
-
-        for (i in 1..3) {
-            val starImg = ImageView(this).apply {
-                setImageResource(R.drawable.star1)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                adjustViewBounds = true
-                alpha = if (i <= stars) 1.0f else 0.25f
-            }
-            starRow.addView(
-                starImg,
-                LinearLayout.LayoutParams(starSize, starSize).apply {
-                    leftMargin = starMargin
-                    rightMargin = starMargin
-                }
-            )
-        }
-
-        panel.addView(
-            starRow,
-            LinearLayout.LayoutParams(-1, 0, 1.1f)
-        )
-
-        val stats = TextView(this).apply {
-            text = "TIME     $timeTaken\n" +
-                    "ARROWS   $arrowsCleared"
-            textSize = 15f
-            gravity = Gravity.CENTER
-            setLineSpacing(dp(5).toFloat(), 1f)
-            setTextColor(Color.WHITE)
-            background = rounded(Color.rgb(7, 38, 78), 14)
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-        }
-
-        panel.addView(
-            stats,
-            LinearLayout.LayoutParams(-1, 0, 1.2f)
-        )
-
-        fun addActionButton(
-            label: String,
-            color: Int,
-            action: () -> Unit
-        ) {
-            val button = Button(this).apply {
-                text = label
-                textSize = 20f
-                isAllCaps = false
-                typeface = Typeface.create(
-                    "sans-serif",
-                    Typeface.BOLD
-                )
-                setTextColor(Color.rgb(0, 20, 40))
-                background = rounded(color, 14)
-
-                // Keep the label and symbol comfortably inside the button.
-                gravity = Gravity.CENTER
-                minHeight = dp(48)
-                minimumHeight = dp(48)
-                setPadding(dp(8), dp(5), dp(8), dp(5))
-                includeFontPadding = true
-
-                setOnClickListener {
-                    dialog.dismiss()
-                    action()
-                }
-            }
-
-            panel.addView(
-                button,
-                LinearLayout.LayoutParams(
-                    -1,
-                    0,
-                    1f
-                ).apply {
-                    topMargin = dp(5)
-                    bottomMargin = dp(5)
-                }
-            )
-        }
-
-        addActionButton("▶  NEXT LEVEL", Color.rgb(255, 205, 55), onNextLevel)
-        addActionButton("◎  LEVEL MAP", Color.rgb(45, 210, 225), onLevelMap)
-        addActionButton("↻  REPLAY LEVEL", Color.WHITE, onReplay)
-
-        val scrollView = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            addView(
-                panel,
-                FrameLayout.LayoutParams(panelWidth, panelHeight)
-            )
-        }
-
-        screenRoot.addView(
-            scrollView,
-            FrameLayout.LayoutParams(
-                panelWidth,
-                panelHeight,
-                Gravity.CENTER
-            )
-        )
-
-        dialog.setContentView(screenRoot)
-
-        dialog.window?.apply {
-            setBackgroundDrawableResource(android.R.color.transparent)
-            setLayout(-1, -1)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                statusBarColor = Color.TRANSPARENT
-                navigationBarColor = Color.TRANSPARENT
-            }
-        }
-
-        dialog.show()
-
-        // Reapply full-window dimensions after show().
+        // Non-blocking feedback keeps the existing completion dialog intact.
+        Toast.makeText(this, rewardMessage, Toast.LENGTH_SHORT).show()
     }
 
     private fun buyHeartWithStars() {
@@ -1258,163 +716,55 @@ class MainActivity : Activity() {
     }
 
     private fun showGameOver() {
+        if (gameOver) return
+
         gameOver = true
         paused = true
 
-        val cyan = Color.rgb(0, 225, 255)
-        val navy = Color.rgb(3, 16, 39)
-        val panelColor = Color.rgb(5, 28, 59)
-        val white = Color.rgb(239, 247, 255)
-        val muted = Color.rgb(151, 207, 235)
-
-        fun dp(value: Int): Int =
-            (value * resources.displayMetrics.density).toInt()
-
-        fun roundedBackground(fill: Int, stroke: Int, radius: Int = 18) = GradientDrawable().apply {
-            setColor(fill)
-            cornerRadius = dp(radius).toFloat()
-            setStroke(dp(2), stroke)
-        }
-
-        val dialog = Dialog(this)
-        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
-        dialog.setCancelable(false)
-
-        val outer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(16), dp(14), dp(16), dp(14))
-            background = roundedBackground(navy, Color.rgb(255, 75, 65), 24)
-            clipChildren = false
-        }
-
-        val heading = TextView(this).apply {
-            text = "💔 OUT OF HEARTS!"
-            textSize = 22f
-            setTextColor(white)
-            typeface = Typeface.create("sans-serif", Typeface.BOLD_ITALIC)
-            gravity = Gravity.CENTER
-            setShadowLayer(dp(8).toFloat(), 0f, 0f, Color.rgb(255, 75, 65))
-        }
-
-        outer.addView(heading, LinearLayout.LayoutParams(-1, -2))
-
-        val subtitle = TextView(this).apply {
-            text = "LEVEL $level FAILED · STARS: ★ ${progress.totalStars}"
-            textSize = 12f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(Color.rgb(255, 205, 55))
-            gravity = Gravity.CENTER
-            setPadding(0, dp(6), 0, dp(12))
-        }
-
-        outer.addView(subtitle)
-
-        val optionsContainer = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-        }
-
-        fun addOption(icon: String, title: String, description: String, onClick: () -> Unit) {
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(10), dp(10), dp(10), dp(10))
-                background = roundedBackground(panelColor, Color.rgb(20, 67, 115), 18)
-                isClickable = true
-                isFocusable = true
-                setOnClickListener {
-                    dialog.dismiss()
-                    onClick()
-                }
-            }
-
-            val iconView = TextView(this).apply {
-                text = icon
-                textSize = 22f
-                gravity = Gravity.CENTER
-                setTextColor(cyan)
-                background = roundedBackground(Color.rgb(4, 43, 83), Color.rgb(0, 106, 190), 14)
-            }
-
-            row.addView(iconView, LinearLayout.LayoutParams(dp(44), dp(44)))
-
-            val textColumn = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(dp(12), 0, dp(6), 0)
-            }
-
-            val titleView = TextView(this).apply {
-                text = title
-                textSize = 15f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(white)
-            }
-
-            val descriptionView = TextView(this).apply {
-                text = description
-                textSize = 11f
-                setTextColor(muted)
-                setPadding(0, dp(2), 0, 0)
-            }
-
-            textColumn.addView(titleView)
-            textColumn.addView(descriptionView)
-
-            row.addView(textColumn, LinearLayout.LayoutParams(0, -2, 1f))
-
-            optionsContainer.addView(row, LinearLayout.LayoutParams(-1, -2).apply {
-                bottomMargin = dp(8)
-            })
-        }
-
-        if (progress.totalStars >= 10) {
-            addOption("❤️", "Buy 1 Heart (★ 10)", "Exchange 10 stars to get 1 heart & continue") {
+        GameOverDialog(
+            activity = this,
+            level = level,
+            totalStars = progress.totalStars,
+            canBuyHeart = progress.totalStars >= 10,
+            onBuyHeart = {
                 if (gameController.spendStars(10)) {
                     gameController.grantBonusLife()
                     progress = storage.loadProgress()
                     gameOver = false
                     paused = false
+                    lives = gameController.state.lives
                     updateUI()
                     GameAudio.playVictory(progress.soundEnabled)
-                    Toast.makeText(this, "❤️ Purchased 1 Heart!", Toast.LENGTH_SHORT).show()
+
+                    Toast.makeText(
+                        this,
+                        "❤️ Purchased 1 Heart!",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
+            },
+            onAdHeart = {
+                gameController.grantBonusLife()
+                progress = storage.loadProgress()
+                gameOver = false
+                paused = false
+                lives = gameController.state.lives
+                updateUI()
+                GameAudio.playVictory(progress.soundEnabled)
+
+                Toast.makeText(
+                    this,
+                    "🎬 Ad Reward: +1 Heart Granted!",
+                    Toast.LENGTH_SHORT
+                ).show()
+            },
+            onRestart = {
+                loadLevel(level)
+            },
+            onLevelMap = {
+                openLevelMapHome()
             }
-        }
-
-        addOption("↺", "Restart Level", "Restart level $level from beginning") {
-            loadLevel(level)
-        }
-
-        addOption("🗺️", "Level Map", "Return to level map screen") {
-            openLevelMapHome()
-        }
-
-        outer.addView(optionsContainer)
-
-        val scrollView = ScrollView(this).apply {
-            isFillViewport = true
-            clipToPadding = false
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            addView(outer, FrameLayout.LayoutParams(-1, -2))
-        }
-
-        val width = minOf((resources.displayMetrics.widthPixels * 0.88f).toInt(), dp(420))
-
-        val cardHolder = FrameLayout(this).apply {
-            setBackgroundColor(Color.argb(105, 245, 248, 255))
-            addView(scrollView, FrameLayout.LayoutParams(width, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.CENTER))
-        }
-
-        dialog.setContentView(cardHolder)
-        dialog.window?.apply {
-            setBackgroundDrawable(Color.TRANSPARENT.toDrawable())
-            setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
-            addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN)
-            setGravity(Gravity.CENTER)
-        }
-
-        dialog.show()
+        ).show()
     }
 
     private fun showMenuDialog() {

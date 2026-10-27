@@ -28,6 +28,7 @@ class CandyCrushLevelMapView(
     private val rect = RectF()
 
     private val stageSize = 25
+
     private val stageNames = arrayOf(
         "GREEN FIELDS",
         "DESERT RUINS",
@@ -41,6 +42,8 @@ class CandyCrushLevelMapView(
         Color.rgb(50, 190, 255),
         Color.rgb(255, 75, 65)
     )
+
+    private val accent = Color.rgb(0, 220, 255)
 
     private var selectedStage =
         ((currentLevel - 1).coerceAtLeast(0) / stageSize).coerceIn(0, 3)
@@ -57,8 +60,13 @@ class CandyCrushLevelMapView(
         unlockedLevel: Int,
         currentLevel: Int
     ) {
+        // Never trust a level selection as unlock progress.
         this.unlockedLevel = unlockedLevel.coerceIn(1, totalLevels)
         this.currentLevel = currentLevel.coerceIn(1, totalLevels)
+
+        // Update the displayed world to match the map selection.
+        selectedStage = ((this.currentLevel - 1) / stageSize).coerceIn(0, 3)
+
         invalidate()
     }
 
@@ -124,10 +132,7 @@ class CandyCrushLevelMapView(
         val h = height.toFloat()
         if (w <= 0f || h <= 0f) return
 
-        val accent = stageColors[selectedStage]
-
-        // Deep-space background
-        paint.shader = LinearGradient(
+        val background = LinearGradient(
             0f, 0f, w, h,
             intArrayOf(
                 Color.rgb(3, 10, 31),
@@ -137,59 +142,91 @@ class CandyCrushLevelMapView(
             null,
             Shader.TileMode.CLAMP
         )
+
+        paint.shader = background
+        paint.style = Paint.Style.FILL
         canvas.drawRect(0f, 0f, w, h, paint)
         paint.shader = null
 
-        // Decorative stars
+        // Decorative stars.
         paint.style = Paint.Style.FILL
         for (i in 0 until 55) {
-            val x = ((i * 83f + 17f) % w)
-            val y = ((i * 109f + 31f) % h)
+            val x = (i * 83f + 17f) % w
+            val y = (i * 109f + 31f) % h
+
             paint.color = Color.argb(
                 90 + (i % 5) * 25,
                 120, 210, 255
             )
-            canvas.drawCircle(x, y, dp(1f + (i % 3) * 0.5f), paint)
+
+            canvas.drawCircle(
+                x,
+                y,
+                dp(1f + (i % 3) * 0.5f),
+                paint
+            )
         }
 
         val margin = dp(12f)
         val contentWidth = w - margin * 2f
 
-        // Header Title
+        // Header.
         rect.set(margin, dp(10f), w - margin, dp(58f))
         rounded(
-            canvas, rect, 16f,
-            Color.rgb(5, 26, 67), accent, 2f
-        )
-        text(
-            canvas, "LEVEL MAP",
-            w / 2f, dp(40f), 24f, Color.WHITE
+            canvas,
+            rect,
+            16f,
+            Color.rgb(5, 26, 67),
+            accent,
+            2f
         )
 
-        // Stage selection tabs (horizontally scrollable row)
+        text(
+            canvas,
+            "LEVEL MAP",
+            w / 2f,
+            dp(40f),
+            24f,
+            Color.WHITE
+        )
+
+        // World selection tabs.
         stageRects.clear()
+
         val tabGap = dp(8f)
         val tabWidth = dp(145f)
         val tabTop = dp(66f)
-        val tabHeight = dp(77f) // +20% height increase
+        val tabHeight = dp(77f)
         val totalTabsWidth = 4 * tabWidth + 3 * tabGap
 
         maxTabScrollX = (totalTabsWidth - contentWidth).coerceAtLeast(0f)
         tabScrollX = tabScrollX.coerceIn(0f, maxTabScrollX)
 
         canvas.save()
-        val tabClipRect = RectF(margin, tabTop - dp(2f), w - margin, tabTop + tabHeight + dp(2f))
+
+        val tabClipRect = RectF(
+            margin,
+            tabTop - dp(2f),
+            w - margin,
+            tabTop + tabHeight + dp(2f)
+        )
+
         canvas.clipRect(tabClipRect)
 
         for (stage in 0..3) {
             val left = margin + stage * (tabWidth + tabGap) - tabScrollX
+
             val tab = RectF(
-                left, tabTop,
-                left + tabWidth, tabTop + tabHeight
+                left,
+                tabTop,
+                left + tabWidth,
+                tabTop + tabHeight
             )
+
             stageRects.add(tab)
 
             val unlockedStage = stage * stageSize + 1 <= unlockedLevel
+
             val tabColor = if (stage == selectedStage) {
                 Color.rgb(10, 50, 93)
             } else {
@@ -197,47 +234,57 @@ class CandyCrushLevelMapView(
             }
 
             rounded(
-                canvas, tab, 12f,
+                canvas,
+                tab,
+                12f,
                 tabColor,
-                if (stage == selectedStage) stageColors[stage]
-                else Color.rgb(55, 78, 120),
+                if (stage == selectedStage) {
+                    stageColors[stage]
+                } else {
+                    Color.rgb(55, 78, 120)
+                },
                 if (stage == selectedStage) 2.2f else 1f
             )
 
-            // Row 1: WORLD Number (+25% font size)
             text(
-                canvas, "WORLD ${stage + 1}",
-                tab.centerX(), tab.top + dp(22f),
+                canvas,
+                "WORLD ${stage + 1}",
+                tab.centerX(),
+                tab.top + dp(22f),
                 13.8f,
                 if (unlockedStage) Color.WHITE
                 else Color.rgb(135, 151, 181)
             )
 
-            // Row 2: World Name (+25% font size)
             text(
-                canvas, stageNames[stage],
-                tab.centerX(), tab.top + dp(42f),
+                canvas,
+                stageNames[stage],
+                tab.centerX(),
+                tab.top + dp(42f),
                 12.5f,
                 if (unlockedStage) stageColors[stage]
                 else Color.rgb(115, 131, 161)
             )
 
-            // Row 3: Level count ratio (+25% font size)
             val firstLvl = stage * stageSize + 1
             val lastLvl = min(firstLvl + stageSize - 1, totalLevels)
-            val completedInStage = (firstLvl..lastLvl).count { it < unlockedLevel }
+            val completedInStage =
+                (firstLvl..lastLvl).count { it < unlockedLevel }
 
             text(
-                canvas, "$completedInStage / $stageSize",
-                tab.centerX(), tab.top + dp(62f),
+                canvas,
+                "$completedInStage / $stageSize",
+                tab.centerX(),
+                tab.top + dp(62f),
                 13.8f,
                 if (unlockedStage) Color.rgb(255, 211, 65)
                 else Color.GRAY
             )
         }
+
         canvas.restore()
 
-        // Five-by-five level grid directly below scrollable stage tabs
+        // Five-by-five level grid.
         levelRects.clear()
 
         val gridLeft = margin + dp(3f)
@@ -252,14 +299,16 @@ class CandyCrushLevelMapView(
         val gapY = dp(9f)
 
         val cellWidth = (availableWidth - gapX * 4f) / 5f
+
         val cellHeight = min(
-            dp(86f), // +20% height increase
+            dp(86f),
             (availableHeight - gapY * 4f) / 5f
         )
 
         val gridHeight = cellHeight * 5f + gapY * 4f
+
         val actualTop = gridTop +
-            ((availableHeight - gridHeight) / 2f).coerceAtLeast(0f)
+                ((availableHeight - gridHeight) / 2f).coerceAtLeast(0f)
 
         val firstLevel = selectedStage * stageSize + 1
 
@@ -274,9 +323,12 @@ class CandyCrushLevelMapView(
             val top = actualTop + row * (cellHeight + gapY)
 
             val levelRect = RectF(
-                left, top,
-                left + cellWidth, top + cellHeight
+                left,
+                top,
+                left + cellWidth,
+                top + cellHeight
             )
+
             levelRects.add(levelNumber to levelRect)
 
             val isUnlocked = levelNumber <= unlockedLevel
@@ -284,64 +336,68 @@ class CandyCrushLevelMapView(
             val stars = getBestStars(levelNumber).coerceIn(0, 3)
 
             val fillColor = when {
-                isCurrent -> Color.rgb(190, 150, 45)
+                isCurrent -> Color.rgb(210, 220, 235)
                 isUnlocked -> Color.rgb(5, 104, 190)
                 else -> Color.rgb(25, 35, 59)
             }
 
             val borderColor = when {
-                isCurrent -> Color.rgb(215, 185, 90)
+                isCurrent -> Color.rgb(235, 242, 255)
                 isUnlocked -> accent
                 else -> Color.rgb(68, 83, 117)
             }
 
-            // Glow around current level
             if (isCurrent) {
                 paint.style = Paint.Style.STROKE
                 paint.strokeWidth = dp(3.5f)
-                paint.color = Color.argb(70, 215, 185, 90)
+                paint.color = Color.argb(130, 220, 230, 250)
+
                 val glow = RectF(levelRect)
                 glow.inset(-dp(2.5f), -dp(2.5f))
-                canvas.drawRoundRect(glow, dp(12f), dp(12f), paint)
+
+                canvas.drawRoundRect(
+                    glow,
+                    dp(12f),
+                    dp(12f),
+                    paint
+                )
             }
 
             rounded(
-                canvas, levelRect, 10f,
-                fillColor, borderColor, 1.7f
+                canvas,
+                levelRect,
+                10f,
+                fillColor,
+                borderColor,
+                1.7f
             )
 
             val centerX = levelRect.centerX()
 
             if (isUnlocked) {
-                // Level number at the top (+25% font size)
                 text(
                     canvas,
                     levelNumber.toString(),
                     centerX,
                     levelRect.top + cellHeight * 0.48f,
                     if (cellWidth < dp(55f)) 18.5f else 22.5f,
-                    if (isCurrent) Color.rgb(30, 30, 45) else Color.WHITE
+                    if (isCurrent) Color.rgb(30, 30, 45)
+                    else Color.WHITE
                 )
 
-                // Earned stars below the number (+25% font size)
-                val starText = when (stars) {
-                    3 -> "★★★"
-                    2 -> "★★☆"
-                    1 -> "★☆☆"
-                    else -> "☆☆☆"
+                if (stars > 0) {
+                    val starText = "★".repeat(stars)
+
+                    text(
+                        canvas,
+                        starText,
+                        centerX,
+                        levelRect.bottom - dp(6f),
+                        17.5f,
+                        Color.rgb(255, 218, 66)
+                    )
                 }
-
-                text(
-                    canvas,
-                    starText,
-                    centerX,
-                    levelRect.bottom - dp(8f),
-                    12.5f,
-                    if (stars > 0) Color.rgb(255, 218, 66)
-                    else Color.rgb(117, 139, 170)
-                )
             } else {
-                // Locked level: number on top (+25% font size)
                 text(
                     canvas,
                     levelNumber.toString(),
@@ -351,7 +407,6 @@ class CandyCrushLevelMapView(
                     Color.rgb(174, 190, 218)
                 )
 
-                // Lock symbol directly below the number (+25% font size)
                 text(
                     canvas,
                     "🔒",
@@ -363,12 +418,13 @@ class CandyCrushLevelMapView(
             }
         }
 
-        // Footer instruction (+25% font size)
         text(
             canvas,
             "SELECT AN UNLOCKED LEVEL TO PLAY",
-            w / 2f, h - dp(10f),
-            12.5f, Color.rgb(158, 198, 236)
+            w / 2f,
+            h - dp(10f),
+            12.5f,
+            Color.rgb(158, 198, 236)
         )
     }
 
@@ -386,16 +442,21 @@ class CandyCrushLevelMapView(
             MotionEvent.ACTION_MOVE -> {
                 if (maxTabScrollX > 0f && y in dp(60f)..dp(140f)) {
                     val dx = x - tabLastTouchX
+
                     if (!isTabDragging && abs(dx) > dp(3f)) {
                         isTabDragging = true
                     }
+
                     if (isTabDragging) {
-                        tabScrollX = (tabScrollX - dx).coerceIn(0f, maxTabScrollX)
+                        tabScrollX = (tabScrollX - dx)
+                            .coerceIn(0f, maxTabScrollX)
+
                         tabLastTouchX = x
                         invalidate()
                         return true
                     }
                 }
+
                 return true
             }
 
@@ -423,6 +484,7 @@ class CandyCrushLevelMapView(
                         } else {
                             onLockedLevelTapped?.invoke(levelNumber)
                         }
+
                         return true
                     }
                 }

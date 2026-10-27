@@ -174,13 +174,21 @@ class GameController(
     }
 
     fun grantBonusLife(): Boolean {
-        if (state.phase != GamePhase.PLAYING || state.lives >= 3) {
-            return false
-        }
+        if (state.lives >= 3) return false
+
+        val newLives = (state.lives + 1).coerceAtMost(3)
+        val newPhase = if (state.phase == GamePhase.LOST) GamePhase.PLAYING else state.phase
 
         state = state.copy(
-            lives = (state.lives + 1).coerceAtMost(3)
+            lives = newLives,
+            phase = newPhase
         )
+
+        if (newPhase == GamePhase.PLAYING && !active) {
+            active = true
+            lastTick = android.os.SystemClock.elapsedRealtime()
+            handler.postDelayed(timer, 250L)
+        }
 
         publish()
         persist()

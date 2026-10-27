@@ -21,9 +21,12 @@ class GameSaveRepository(context: Context) {
         vibrationEnabled: Boolean,
         reducedMotion: Boolean,
     ) {
+        val savedUnlocked = prefs.getInt("unlocked_level", 1)
+        val highestUnlocked = maxOf(savedUnlocked, unlockedLevel, 1)
+
         prefs.edit {
             putInt("current_level", currentLevel)
-            putInt("unlocked_level", maxOf(unlockedLevel, 1))
+            putInt("unlocked_level", highestUnlocked)
             putInt("total_stars", maxOf(stars, 0))
             putBoolean("sound_enabled", soundEnabled)
             putBoolean("vibration_enabled", vibrationEnabled)
