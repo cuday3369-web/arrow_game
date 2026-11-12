@@ -49,7 +49,6 @@ class MainActivity : Activity() {
     private lateinit var colorfulBackground: ColorfulBackgroundView
 
     private lateinit var storage: GameStorage
-    private lateinit var api: ApiClient
     private lateinit var gameController: GameController
     private lateinit var saveRepository: GameSaveRepository
     private lateinit var puzzleEngine: GamePuzzleEngine
@@ -83,8 +82,6 @@ class MainActivity : Activity() {
 
         progress = storage.loadProgress()
         level = progress.unlockedLevel
-
-        api = ApiClient("http://10.171.52.13:8000")
 
         gameController = GameController(
             engine = puzzleEngine,
@@ -124,10 +121,22 @@ class MainActivity : Activity() {
     }
 
     private fun showExitArrowIntro() {
+        // Hide the game screen while the intro title is drawn. The main menu
+        // header also contains "EXIT ARROW"; leaving it visible underneath
+        // the animated title makes the name appear twice.
+        root.visibility = View.INVISIBLE
+        colorfulBackground.visibility = View.INVISIBLE
+        confettiOverlay.visibility = View.INVISIBLE
+
         val intro = ExitArrowIntroView(this) {
             runOnUiThread {
                 val overlay = frameRoot.findViewWithTag<View>("exit_arrow_intro")
                 if (overlay != null) frameRoot.removeView(overlay)
+
+                // Restore the normal game UI after the intro has completed.
+                root.visibility = View.VISIBLE
+                colorfulBackground.visibility = View.VISIBLE
+                confettiOverlay.visibility = View.VISIBLE
             }
         }
         intro.tag = "exit_arrow_intro"
@@ -305,15 +314,6 @@ class MainActivity : Activity() {
             background = neonPanel(GameTheme.CYAN, Color.argb(220, 3, 20, 48), 12)
             setOnClickListener { GameEffects.tap(this, progress.reducedMotion); showMenuDialog() }
         }
-        val brand = GameTheme.text(this, "EXIT ARROW", 22f, GameTheme.WHITE, true).apply {
-            gravity = Gravity.CENTER
-            maxLines = 1
-            setShadowLayer(GameTheme.dp(this@MainActivity, 8).toFloat(), 0f, 0f, GameTheme.CYAN)
-        }
-        if (!progress.reducedMotion) {
-            GameEffects.openingLogoBounceDropIn(brand)
-            GameEffects.gentleIdleWiggle(brand)
-        }
         starsLabel = GameTheme.text(this, "★ ${progress.totalStars}", 15.5f, GameTheme.GOLD, true).apply {
             gravity = Gravity.CENTER
             setPadding(GameTheme.dp(this@MainActivity, 8), GameTheme.dp(this@MainActivity, 8), GameTheme.dp(this@MainActivity, 8), GameTheme.dp(this@MainActivity, 8))
@@ -327,7 +327,7 @@ class MainActivity : Activity() {
         }
         header.addView(topMenuBtn)
         header.addView(space(GameTheme.dp(this, 5)), LinearLayout.LayoutParams(GameTheme.dp(this, 5), 1))
-        header.addView(brand, LinearLayout.LayoutParams(0, -2, 1f))
+        header.addView(space(GameTheme.dp(this, 5)), LinearLayout.LayoutParams(0, 1, 1f))
         header.addView(starsLabel)
         header.addView(space(GameTheme.dp(this, 5)), LinearLayout.LayoutParams(GameTheme.dp(this, 5), 1))
         header.addView(exitLevelBtn)

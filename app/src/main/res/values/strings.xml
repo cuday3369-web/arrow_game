@@ -22,4 +22,5 @@
     <string name="settings_title">SETTINGS</string>
     <string name="settings_subtitle">PERSONALIZE YOUR GAME</string>
     <string name="settings_done_btn">DONE</string>
+    <string name="exit_arrow_app_name">EXIT ARROW</string>
 </resources>

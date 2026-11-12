@@ -1,7 +1,6 @@
 package com.yogi.exitarrow
 
 import android.content.Context
-import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.LinearGradient
@@ -9,589 +8,749 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RadialGradient
 import android.graphics.Shader
-import android.graphics.Typeface
 import android.os.SystemClock
 import android.view.View
-import android.view.animation.DecelerateInterpolator
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.random.Random
 
-class ExitArrowIntroView @JvmOverloads constructor(
+/**
+ * Native Android Canvas implementation of the EXIT ARROW intro.
+ *
+ * Phase 1: six arrowheads move outward from the exact screen centre.
+ *          Their shafts remain connected to the centre along the same spiral.
+ * Phase 2: after the last arrowhead reaches the screen edge, all six tails
+ *          move outward together along their own spiral paths.
+ * Particles emit continuously until Phase 1 ends, then leave the screen
+ * without bouncing. The existing MainActivity constructor/callback API is kept.
+ */
+class ExitArrowIntroView(
     context: Context,
     private val onFinished: (() -> Unit)? = null
 ) : View(context) {
 
     companion object {
-        private const val DURATION = 7200L
-        private const val FRAME_DELAY = 16L
-        private const val ARROW_COUNT = 18
-        private const val TWO_PI = Math.PI * 2.0
+        private const val TWO_PI = (PI * 2.0).toFloat()
+
+        // Global intro playback speed. 2.0f is 200% playback (twice normal speed).
+        // All intro phases use the same clock so their timing stays synchronized.
+        private const val INTRO_SPEED = 2.0f
+
+        private const val HEAD_START_U = 0.045f
+        private const val TAIL_START_U = 0f
+        private const val ARROW_GROWTH = 0.20f
+        private const val HEAD_NOTCH_BACK_RATIO = 0.60f
+        private const val HEAD_WIDTH_RATIO = 0.88f
+        private const val HEAD_OVERSHOOT_U = 0.16f
+        private const val HEAD_OVERSHOOT_MS = 450L
+        private const val TAIL_EXIT_MS = 2_800L
+        private const val PARTICLES_PER_SECOND = 90f
+        private const val MAX_ACTIVE_PARTICLES = 1_200
     }
 
-    private val density = resources.displayMetrics.density
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val path = Path()
-    private val random = java.util.Random(42L)
-
-    private var startTime = 0L
-    private var lastFrame = 0L
-    private var animationFinished = false
-
-    private val interpolator = DecelerateInterpolator()
-
-    private val colors = intArrayOf(
-        Color.rgb(255, 35, 65),
-        Color.rgb(255, 105, 0),
-        Color.rgb(255, 220, 25),
-        Color.rgb(80, 255, 55),
-        Color.rgb(0, 255, 200),
-        Color.rgb(0, 165, 255),
-        Color.rgb(100, 70, 255),
-        Color.rgb(255, 30, 220)
-    )
+    private val config = ExitArrowConfig.load(context)
+    private val headDurationMs = config.durationMs
+    private val totalDurationMs = headDurationMs + TAIL_EXIT_MS
 
     private data class Arrow(
-        val angle: Float,
-        val delay: Float,
-        val colorIndex: Int,
-        val direction: Float,
-        val size: Float
+        val color: Int,
+        val baseAngle: Float,
+        var boundaryU: Float = 1f
     )
 
-    private val arrows = List(ARROW_COUNT) { i ->
+    private data class Particle(
+        val baseAngle: Float,
+        var progress: Float,
+        val speed: Float,
+        var x: Float,
+        var y: Float,
+        var previousX: Float,
+        var previousY: Float,
+        val radius: Float,
+        val color: Int
+    )
+
+    private val palette = config.colors()
+
+    private val arrows = MutableList(6) { index ->
         Arrow(
-            angle = (TWO_PI * i / ARROW_COUNT).toFloat() +
-                    (random.nextFloat() - 0.5f) * 0.20f,
-            delay = random.nextFloat() * 0.45f,
-            colorIndex = i % colors.size,
-            direction = if (i % 2 == 0) 1f else -1f,
-            size = 0.75f + random.nextFloat() * 0.55f
+            color = palette[index % palette.size],
+            baseAngle = -PI.toFloat() / 2f + index * TWO_PI / 6f
         )
     }
 
-    private val particles = List(140) {
-        floatArrayOf(
-            random.nextFloat(),
-            random.nextFloat(),
-            0.4f + random.nextFloat() * 2.0f,
-            random.nextFloat() * TWO_PI.toFloat(),
-            0.4f + random.nextFloat() * 1.8f
-        )
+    private val particles = ArrayList<Particle>(MAX_ACTIVE_PARTICLES)
+    private val random = Random(9217)
+
+    private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG)
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
     }
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.SUBPIXEL_TEXT_FLAG)
 
-    private val backgroundPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        shader = LinearGradient(
-            0f, 0f, 0f, 1000f,
-            intArrayOf(
-                Color.rgb(1, 4, 17),
-                Color.rgb(3, 8, 30),
-                Color.rgb(0, 2, 12)
-            ),
-            null,
-            Shader.TileMode.CLAMP
-        )
+    private val arrowPath = Path()
+
+    private var started = false
+    private var completed = false
+    private var startTime = 0L
+    private var previousFrameTime = 0L
+    private var emissionAccumulator = 0f
+    private var particleEmissionStopped = false
+
+    private var cx = 0f
+    private var cy = 0f
+    private var shortSide = 0f
+    private var diagonal = 0f
+    private var density = 1f
+    private var titleBaseline = 0f
+    private var lastKnownWidth = 0
+    private var lastKnownHeight = 0
+    private var lastBoundaryU = 1f
+
+    init {
+        // Canvas glow uses software shadow layers for consistent Android rendering.
+        setLayerType(LAYER_TYPE_SOFTWARE, null)
+        isClickable = false
+        isFocusable = false
     }
-
-    private fun dp(value: Float) = value * density
-
-    private fun clamp(value: Float) = value.coerceIn(0f, 1f)
-
-    private fun smooth(value: Float): Float {
-        val x = clamp(value)
-        return x * x * (3f - 2f * x)
-    }
-
-    private fun progress(t: Float, begin: Float, end: Float): Float =
-        smooth((t - begin) / (end - begin))
-
-    private fun colorAt(index: Int): Int =
-        colors[Math.floorMod(index, colors.size)]
 
     fun start() {
+        if (started) return
+        started = true
+        completed = false
+        particleEmissionStopped = false
+        emissionAccumulator = 0f
+        particles.clear()
         startTime = SystemClock.uptimeMillis()
-        lastFrame = 0L
-        animationFinished = false
+        previousFrameTime = startTime
+        visibility = VISIBLE
         postInvalidateOnAnimation()
     }
 
-    override fun onAttachedToWindow() {
-        super.onAttachedToWindow()
-        start()
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        lastKnownWidth = 0
+        lastKnownHeight = 0
+        updateGeometry(w, h)
     }
 
-    override fun onDetachedFromWindow() {
-        removeCallbacks(null)
-        super.onDetachedFromWindow()
+    private fun updateGeometry(w: Int, h: Int) {
+        if (w <= 0 || h <= 0) return
+        if (w == lastKnownWidth && h == lastKnownHeight) return
+
+        lastKnownWidth = w
+        lastKnownHeight = h
+        density = resources.displayMetrics.density
+        shortSide = min(w, h).toFloat()
+        diagonal = kotlin.math.hypot(w.toFloat(), h.toFloat())
+
+        // The animation origin is the exact screen centre.
+        cx = w * 0.5f
+        cy = h * 0.5f
+        titleBaseline = h * config.titleYFraction
+
+        arrows.forEach { it.boundaryU = findBoundary(it.baseAngle) }
+        lastBoundaryU = arrows.maxOfOrNull { it.boundaryU } ?: 1f
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        if (!started || width <= 0 || height <= 0) return
 
-        if (width <= 0 || height <= 0) return
+        updateGeometry(width, height)
 
         val now = SystemClock.uptimeMillis()
 
-        if (lastFrame == 0L) lastFrame = now
+        // Use a scaled animation clock for the complete intro: arrows,
+        // synchronized tail release, particle emission/physics, logo,
+        // and the completion callback all run at normal 100% playback speed.
+        val realElapsedMs = (now - startTime).coerceAtLeast(0L)
+        val elapsed = (realElapsedMs * INTRO_SPEED).toLong()
 
-        val t = ((now - startTime).coerceAtLeast(0L) / 1000f)
-            .coerceAtMost(7.2f)
+        val realDeltaMs = (now - previousFrameTime).coerceIn(0L, 40L)
+        val deltaMs = (realDeltaMs * INTRO_SPEED).toLong()
+        previousFrameTime = now
 
-        val w = width.toFloat()
-        val h = height.toFloat()
-        val cx = w * 0.5f
-        val cy = h * 0.46f
-        val unit = min(w, h)
+        val seconds = elapsed / 1000f
+        if (elapsed >= headDurationMs) particleEmissionStopped = true
 
-        canvas.drawColor(Color.BLACK)
-        canvas.drawRect(0f, 0f, w, h, backgroundPaint)
+        val headPhase = (elapsed.toFloat() / headDurationMs).coerceIn(0f, 1f)
+        val headEased = easeInOutCubic(headPhase)
 
-        drawBackgroundGlow(canvas, cx, cy, unit, t)
-        drawParticles(canvas, w, h, cx, cy, unit, t)
+        val headU: Float
+        val tailU: Float
 
-        when {
-            t < 0.8f -> {
-                // 1. Cinematic opening.
-            }
+        if (elapsed <= headDurationMs) {
+            headU = lerp(HEAD_START_U, lastBoundaryU, headEased)
+            tailU = TAIL_START_U
+        } else {
+            val tailElapsed = elapsed - headDurationMs
+            val overshootProgress = easeOutCubic(
+                tailElapsed.toFloat() / HEAD_OVERSHOOT_MS
+            )
+            headU = lastBoundaryU + HEAD_OVERSHOOT_U * overshootProgress
 
-            t < 2.8f -> {
-                // 2–3. Arrows enter and sweep across the screen.
-                drawArrows(canvas, cx, cy, unit, t, 0.8f, 2.8f)
-            }
-
-            t < 4.2f -> {
-                // 4. Arrows follow a curved spiral toward the center.
-                drawSwirl(canvas, cx, cy, unit, t)
-            }
-
-            t < 5.4f -> {
-                // 5–6. Central flash and expanding energy ring.
-                drawConvergence(canvas, cx, cy, unit, t)
-            }
-
-            t < 6.6f -> {
-                // 7–8. Logo reveal, growth and glow.
-                drawArrows(
-                    canvas, cx, cy, unit, t,
-                    5.4f, 6.2f, 0.28f
-                )
-                drawTitle(canvas, cx, cy, unit, t)
-                drawEnergyRing(canvas, cx, cy, unit, t, 0.25f)
-            }
-
-            t < 6.8f -> {
-                // 9. Crisp final logo, surrounding arrows fade.
-                drawArrows(
-                    canvas, cx, cy, unit, t,
-                    5.4f, 6.8f, 0.18f
-                )
-                drawTitle(canvas, cx, cy, unit, t)
-            }
-
-            else -> {
-                // 10. Final logo and rainbow swoosh.
-                drawSwoosh(canvas, cx, cy, unit, t)
-                drawTitle(canvas, cx, cy, unit, t)
-            }
+            val tailProgress = easeInOutCubic(
+                tailElapsed.toFloat() / TAIL_EXIT_MS
+            )
+            tailU = lerp(
+                TAIL_START_U,
+                lastBoundaryU + HEAD_OVERSHOOT_U + 0.10f,
+                tailProgress
+            )
         }
 
-        if (t < 7.2f && !animationFinished) {
-            lastFrame = now
-            postInvalidateOnAnimation()
-        } else if (!animationFinished) {
-            animationFinished = true
+        canvas.drawColor(Color.rgb(8, 8, 18))
+        drawBackgroundGlow(canvas, seconds)
+        drawStars(canvas, seconds)
+        drawCoreGlow(canvas, seconds, headPhase)
+
+        emitParticles(deltaMs / 1000f)
+        updateParticles(deltaMs / 1000f)
+        drawParticles(canvas)
+
+        arrows.forEach { arrow ->
+            drawArrow(canvas, arrow, headU, tailU)
+        }
+
+        // Keep the original EXIT ARROW title treatment, revealing it as
+        // the tails begin their synchronized exit from the centre.
+        val logoStart = headDurationMs - 250L
+        val logoProgress = (
+                (elapsed - logoStart).toFloat() /
+                        (totalDurationMs - logoStart).toFloat()
+                ).coerceIn(0f, 1f)
+        if (elapsed >= logoStart) {
+            drawLogo(canvas, logoProgress, seconds)
+        }
+
+        // Keep this view animating after the arrows leave until every
+        // already-emitted particle has also crossed a screen boundary.
+        if (elapsed >= totalDurationMs && particles.isEmpty() && !completed) {
+            completed = true
             onFinished?.invoke()
+        } else if (!completed) {
+            postInvalidateOnAnimation()
         }
     }
 
-    private fun drawBackgroundGlow(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val intensity = when {
-            t < 0.8f -> 0.30f
-            t < 4.2f -> 0.48f
-            t < 5.4f -> 0.85f
-            else -> 0.30f
+    // ============================================
+    // SHARED SPIRAL GEOMETRY
+    // ============================================
+
+    private fun spiralPosition(baseAngle: Float, u: Float): Pair<Float, Float> {
+        val radius = diagonal * 0.85f * u
+        val angle = baseAngle - config.spiralTurns * TWO_PI * u
+        return Pair(
+            cx + cos(angle) * radius,
+            cy + sin(angle) * radius
+        )
+    }
+
+    private fun tangentAt(baseAngle: Float, u: Float): Pair<Float, Float> {
+        val epsilon = 0.0005f
+        val before = spiralPosition(baseAngle, max(0f, u - epsilon))
+        val after = spiralPosition(baseAngle, u + epsilon)
+        val dx = after.first - before.first
+        val dy = after.second - before.second
+        val length = kotlin.math.hypot(dx, dy).coerceAtLeast(0.0001f)
+        return Pair(dx / length, dy / length)
+    }
+
+    private fun findBoundary(baseAngle: Float): Float {
+        var previousU = 0f
+        val samples = 2_500
+
+        for (i in 1..samples) {
+            val u = i.toFloat() / samples
+            val p = spiralPosition(baseAngle, u)
+            if (p.first <= 0f || p.first >= width || p.second <= 0f || p.second >= height) {
+                var low = previousU
+                var high = u
+                repeat(24) {
+                    val mid = (low + high) * 0.5f
+                    val test = spiralPosition(baseAngle, mid)
+                    val outside = test.first <= 0f || test.first >= width ||
+                            test.second <= 0f || test.second >= height
+                    if (outside) high = mid else low = mid
+                }
+                return (low + high) * 0.5f
+            }
+            previousU = u
+        }
+        return 1f
+    }
+
+    // ============================================
+    // ARROW DRAWING
+    // Navigation-arrow silhouette matching the supplied reference:
+    // sharp tip, equal rear wings, centred concave notch, and
+    // a spiral shaft that tapers into the notch without a kink.
+    // ============================================
+
+    /**
+     * Arc length of this Archimedean spiral between two parameter values.
+     * The closed-form speed is R * sqrt(1 + (k*u)^2), integrated with
+     * Simpson's rule. This lets the head dimensions stay proportional
+     * even when the spiral curves more strongly near the screen edge.
+     */
+    private fun spiralArcLength(fromU: Float, toU: Float): Float {
+        val a = min(fromU, toU).coerceAtLeast(0f)
+        val b = max(fromU, toU).coerceAtLeast(0f)
+        if (b - a <= 0.000001f) return 0f
+
+        val intervals = 8
+        val step = (b - a) / intervals
+        val k = abs(config.spiralTurns * TWO_PI)
+
+        fun speedFactor(u: Float): Float {
+            val ku = k * u
+            return kotlin.math.sqrt(1f + ku * ku)
         }
 
-        paint.shader = RadialGradient(
-            cx, cy, unit * 0.70f,
+        var sum = speedFactor(a) + speedFactor(b)
+        for (i in 1 until intervals) {
+            val u = a + step * i
+            sum += if (i % 2 == 0) 2f * speedFactor(u) else 4f * speedFactor(u)
+        }
+
+        val radialScale = diagonal * 0.85f
+        return radialScale * step * sum / 3f
+    }
+
+    /** Find the spiral parameter whose arc distance behind headU is targetPx. */
+    private fun parameterBehindDistance(
+        headU: Float,
+        targetPx: Float,
+        minU: Float
+    ): Float {
+        if (targetPx <= 0f) return headU
+        if (spiralArcLength(minU, headU) <= targetPx) return minU
+
+        var low = minU
+        var high = headU
+        repeat(18) {
+            val mid = (low + high) * 0.5f
+            if (spiralArcLength(mid, headU) > targetPx) {
+                low = mid
+            } else {
+                high = mid
+            }
+        }
+        return (low + high) * 0.5f
+    }
+
+    private fun smoothStep(value: Float): Float {
+        val t = value.coerceIn(0f, 1f)
+        return t * t * (3f - 2f * t)
+    }
+
+    private fun drawArrow(
+        canvas: Canvas,
+        arrow: Arrow,
+        headU: Float,
+        tailU: Float
+    ) {
+        if (tailU >= headU) return
+
+        val availableArc = spiralArcLength(tailU, headU)
+        if (availableArc < dp(2f)) return
+
+        // One scale controls every part of the head. The available-path
+        // limit makes the arrow naturally smaller at the centre and while
+        // the tail catches up, without distorting its proportions.
+        val growthProgress = (headU / lastBoundaryU.coerceAtLeast(0.001f))
+            .coerceIn(0f, 1f)
+        val growthScale = 1f + ARROW_GROWTH * growthProgress
+        val desiredHeadLength = dp(34f) * growthScale
+        val headLength = min(desiredHeadLength, availableArc * 0.82f)
+        if (headLength < dp(2.5f)) return
+
+        // The reference icon has a head width just under its length.
+        // Keep this ratio fixed throughout the complete animation.
+        val headWidth = headLength * HEAD_WIDTH_RATIO
+        val bodyWidth = dp(7f) * growthScale
+        val halfBody = bodyWidth * 0.5f
+        val baseAngle = arrow.baseAngle
+
+        val tip = spiralPosition(baseAngle, headU)
+
+        // The notch sits 60% of the head length behind the tip. Its
+        // centre is taken from the actual spiral, so the shaft joins it
+        // without a detached straight segment.
+        val notchDistance = headLength * HEAD_NOTCH_BACK_RATIO
+        val notchU = parameterBehindDistance(
+            headU,
+            notchDistance,
+            tailU
+        )
+        val notch = spiralPosition(baseAngle, notchU)
+
+        // Use the notch-to-tip chord as the local head axis. This keeps
+        // the notch, tip and both wings on one perfectly symmetrical frame.
+        val axisDx = tip.first - notch.first
+        val axisDy = tip.second - notch.second
+        val axisLength = kotlin.math.hypot(axisDx, axisDy).coerceAtLeast(0.0001f)
+        val axisX = axisDx / axisLength
+        val axisY = axisDy / axisLength
+        val normalX = -axisY
+        val normalY = axisX
+
+        // The wing line is one complete head length behind the tip.
+        // The notch is nearer the tip, creating the distinct inward V.
+        val wingCenterX = tip.first - axisX * headLength
+        val wingCenterY = tip.second - axisY * headLength
+        val halfHeadWidth = headWidth * 0.5f
+
+        val leftWingX = wingCenterX + normalX * halfHeadWidth
+        val leftWingY = wingCenterY + normalY * halfHeadWidth
+        val rightWingX = wingCenterX - normalX * halfHeadWidth
+        val rightWingY = wingCenterY - normalY * halfHeadWidth
+
+        // Build the shaft from the exact tail parameter to the exact
+        // notch parameter. Its width eases smoothly to zero at the notch.
+        val span = (notchU - tailU).coerceAtLeast(0f)
+        if (span <= 0.000001f) return
+
+        val steps = max(24, (span * 900f).toInt().coerceAtMost(180))
+        val leftX = FloatArray(steps + 1)
+        val leftY = FloatArray(steps + 1)
+        val rightX = FloatArray(steps + 1)
+        val rightY = FloatArray(steps + 1)
+
+        val taperDistance = min(headLength * 0.42f, spiralArcLength(tailU, notchU) * 0.72f)
+            .coerceAtLeast(dp(0.5f))
+
+        for (i in 0..steps) {
+            val u = lerp(tailU, notchU, i.toFloat() / steps)
+            val p = spiralPosition(baseAngle, u)
+            val tangent = tangentAt(baseAngle, u)
+
+            val remainingToNotch = spiralArcLength(u, notchU)
+            val taperT = (1f - remainingToNotch / taperDistance).coerceIn(0f, 1f)
+            val widthFactor = 1f - smoothStep(taperT)
+            val localHalfWidth = halfBody * widthFactor
+
+            val nx = -tangent.second
+            val ny = tangent.first
+
+            leftX[i] = p.first + nx * localHalfWidth
+            leftY[i] = p.second + ny * localHalfWidth
+            rightX[i] = p.first - nx * localHalfWidth
+            rightY[i] = p.second - ny * localHalfWidth
+        }
+
+        // Smooth, mirrored concave curves from the central notch to
+        // each rear wing. The outer tip-to-wing edges remain crisp.
+        val innerControlAlong = headLength * 0.12f
+        val innerControlAcross = headWidth * 0.10f
+
+        val lowerControl1X = notch.first - axisX * innerControlAlong - normalX * innerControlAcross
+        val lowerControl1Y = notch.second - axisY * innerControlAlong - normalY * innerControlAcross
+        val lowerControl2X = rightWingX + axisX * (headLength * 0.16f) + normalX * (headWidth * 0.07f)
+        val lowerControl2Y = rightWingY + axisY * (headLength * 0.16f) + normalY * (headWidth * 0.07f)
+
+        val upperControl1X = leftWingX + axisX * (headLength * 0.16f) - normalX * (headWidth * 0.07f)
+        val upperControl1Y = leftWingY + axisY * (headLength * 0.16f) - normalY * (headWidth * 0.07f)
+        val upperControl2X = notch.first - axisX * innerControlAlong + normalX * innerControlAcross
+        val upperControl2Y = notch.second - axisY * innerControlAlong + normalY * innerControlAcross
+
+        // Single silhouette:
+        // tail-left -> notch -> lower curved side -> right wing -> tip
+        // -> left wing -> upper curved side -> notch -> tail-right.
+        arrowPath.reset()
+        arrowPath.moveTo(leftX[0], leftY[0])
+
+        for (i in 1..steps) {
+            arrowPath.lineTo(leftX[i], leftY[i])
+        }
+
+        arrowPath.cubicTo(
+            lowerControl1X, lowerControl1Y,
+            lowerControl2X, lowerControl2Y,
+            rightWingX, rightWingY
+        )
+
+        // Outer edge: straight and sharp, like the reference icon.
+        arrowPath.lineTo(tip.first, tip.second)
+        arrowPath.lineTo(leftWingX, leftWingY)
+
+        arrowPath.cubicTo(
+            upperControl1X, upperControl1Y,
+            upperControl2X, upperControl2Y,
+            notch.first, notch.second
+        )
+
+        for (i in steps - 1 downTo 0) {
+            arrowPath.lineTo(rightX[i], rightY[i])
+        }
+        arrowPath.close()
+
+        // Glow pass, followed by a clean solid fill.
+        fillPaint.style = Paint.Style.FILL
+        fillPaint.color = arrow.color
+        fillPaint.alpha = 90
+        fillPaint.setShadowLayer(dp(14f), 0f, 0f, arrow.color)
+        canvas.drawPath(arrowPath, fillPaint)
+
+        fillPaint.clearShadowLayer()
+        fillPaint.alpha = 255
+        canvas.drawPath(arrowPath, fillPaint)
+    }
+
+    // ============================================
+    // CONTINUOUS PARTICLE EMISSION / PHYSICS
+    // ============================================
+
+    private fun emitParticles(deltaSeconds: Float) {
+        if (particleEmissionStopped || deltaSeconds <= 0f) return
+
+        emissionAccumulator += deltaSeconds * PARTICLES_PER_SECOND
+        while (emissionAccumulator >= 1f && particles.size < MAX_ACTIVE_PARTICLES) {
+            createParticle()
+            emissionAccumulator -= 1f
+        }
+        if (particles.size >= MAX_ACTIVE_PARTICLES) {
+            emissionAccumulator = 0f
+        }
+    }
+
+    private fun createParticle() {
+        val angle = random.nextFloat() * TWO_PI
+        particles.add(
+            Particle(
+                baseAngle = angle,
+                progress = 0f,
+                // Particle speed is halved in updateParticles(). Each particle
+                // uses the same spiral equation as the six arrows.
+                speed = 0.26f + random.nextFloat() * 0.16f,
+                x = cx,
+                y = cy,
+                previousX = cx,
+                previousY = cy,
+                radius = dp(0.8f + random.nextFloat() * 1.8f),
+                color = palette[random.nextInt(palette.size)]
+            )
+        )
+    }
+
+    private fun updateParticles(deltaSeconds: Float) {
+        if (deltaSeconds <= 0f || particles.isEmpty()) return
+
+        val dt = deltaSeconds.coerceAtMost(0.04f)
+        val iterator = particles.iterator()
+
+        while (iterator.hasNext()) {
+            val particle = iterator.next()
+            particle.previousX = particle.x
+            particle.previousY = particle.y
+
+            // Same spiral formula as the arrows, with half-speed progression.
+            particle.progress += particle.speed * 0.5f * dt
+
+            val position = spiralPosition(
+                particle.baseAngle,
+                particle.progress
+            )
+            particle.x = position.first
+            particle.y = position.second
+
+            val margin = dp(35f)
+            if (
+                particle.x < -margin || particle.x > width + margin ||
+                particle.y < -margin || particle.y > height + margin ||
+                particle.progress > 2f
+            ) {
+                iterator.remove()
+            }
+        }
+    }
+
+    private fun drawParticles(canvas: Canvas) {
+        for (p in particles) {
+            // Short trail from the previous frame to the current spiral point.
+            linePaint.color = p.color
+            linePaint.alpha = 105
+            linePaint.strokeWidth = max(dp(0.6f), p.radius * 0.65f)
+            linePaint.setShadowLayer(dp(5f), 0f, 0f, p.color)
+            canvas.drawLine(
+                p.previousX,
+                p.previousY,
+                p.x,
+                p.y,
+                linePaint
+            )
+            linePaint.clearShadowLayer()
+
+            fillPaint.color = p.color
+            fillPaint.alpha = 235
+            fillPaint.setShadowLayer(dp(7f), 0f, 0f, p.color)
+            canvas.drawCircle(p.x, p.y, p.radius, fillPaint)
+            fillPaint.clearShadowLayer()
+            fillPaint.alpha = 255
+        }
+        linePaint.alpha = 255
+    }
+
+    // ============================================
+    // BACKGROUND / BRANDING
+    // ============================================
+
+    private fun drawBackgroundGlow(canvas: Canvas, seconds: Float) {
+        val radius = shortSide * 0.90f
+        glowPaint.shader = RadialGradient(
+            cx, cy, radius,
             intArrayOf(
-                Color.argb((45 * intensity).toInt(), 45, 35, 255),
-                Color.argb((24 * intensity).toInt(), 0, 160, 255),
+                Color.argb(42, 0, 115, 255),
+                Color.argb(18, 95, 30, 160),
                 Color.TRANSPARENT
             ),
             floatArrayOf(0f, 0.48f, 1f),
             Shader.TileMode.CLAMP
         )
-        paint.style = Paint.Style.FILL
-        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), paint)
-        paint.shader = null
+        canvas.drawRect(0f, 0f, width.toFloat(), height.toFloat(), glowPaint)
+        glowPaint.shader = null
     }
 
-    private fun drawParticles(
-        canvas: Canvas,
-        w: Float,
-        h: Float,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val burst = progress(t, 4.2f, 5.4f)
-        val titleFade = 1f - progress(t, 6.0f, 6.8f) * 0.65f
+    private fun drawCoreGlow(canvas: Canvas, seconds: Float, progress: Float) {
+        val pulse = 1f + 0.06f * sin(seconds * 5.5f)
+        val radius = shortSide * (0.055f + 0.04f * progress) * pulse
+        glowPaint.shader = RadialGradient(
+            cx, cy, radius,
+            intArrayOf(
+                Color.argb(52, 0, 235, 255),
+                Color.argb(22, 75, 55, 255),
+                Color.TRANSPARENT
+            ),
+            floatArrayOf(0f, 0.42f, 1f),
+            Shader.TileMode.CLAMP
+        )
+        canvas.drawCircle(cx, cy, radius, glowPaint)
+        glowPaint.shader = null
+    }
 
-        particles.forEachIndexed { i, p ->
-            val angle = p[3] + t * 0.20f * p[4]
-            val baseX = p[0] * w
-            val baseY = p[1] * h
-
-            val radialX = cx + cos(angle) * unit * p[0] * 0.55f
-            val radialY = cy + sin(angle) * unit * p[1] * 0.55f
-
-            val x = baseX + (radialX - baseX) * burst
-            val y = baseY + (radialY - baseY) * burst
-
-            val twinkle = 0.35f + 0.65f *
-                    abs(sin(t * 2.5f + i.toFloat()))
-
-            val alpha = (150 * twinkle * titleFade).toInt()
-                .coerceIn(0, 255)
-
-            paint.color = colorAt(i % colors.size)
-            paint.alpha = alpha
-            paint.style = Paint.Style.FILL
-            paint.maskFilter = null
-
-            canvas.drawCircle(
-                x, y,
-                dp(p[2]) * (1f + burst * 0.7f),
-                paint
+    private fun drawStars(canvas: Canvas, seconds: Float) {
+        for (i in 0 until 82) {
+            val x = ((i * 97 + 23) % 997) / 997f * width
+            val y = ((i * 173 + 41) % 991) / 991f * height
+            val twinkle = 0.25f + 0.75f * abs(
+                sin(seconds * (0.8f + (i % 4) * 0.17f) + i)
             )
+            fillPaint.color = Color.argb((105f * twinkle).toInt(), 165, 205, 255)
+            canvas.drawCircle(x, y, dp(0.55f + (i % 3) * 0.22f), fillPaint)
         }
-
-        paint.alpha = 255
     }
 
-    private fun drawArrowShape(
-        canvas: Canvas,
-        x: Float,
-        y: Float,
-        angle: Float,
-        length: Float,
-        color: Int,
-        alpha: Int = 255
-    ) {
-        val shaftWidth = length * 0.12f
-        val headLength = length * 0.43f
-        val headWidth = length * 0.40f
+    private fun drawLogo(canvas: Canvas, raw: Float, seconds: Float) {
+        val p = raw.coerceIn(0f, 1f)
+        val reveal = easeOutBack(p)
+        val alpha = (255f * easeOutCubic(p)).toInt().coerceIn(0, 255)
+        val textSize = shortSide * 0.095f
+        val baseline = titleBaseline + (1f - reveal) * shortSide * 0.045f
+        val pulse = 0.88f + 0.12f * sin(seconds * 3.1f)
+
+        textPaint.typeface = android.graphics.Typeface.create(
+            "sans-serif-black", android.graphics.Typeface.BOLD
+        )
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.textSize = textSize
+        textPaint.style = Paint.Style.FILL
+        textPaint.alpha = alpha
+        textPaint.setShadowLayer(shortSide * 0.035f * pulse, 0f, 0f, Color.rgb(0, 205, 255))
+        textPaint.shader = LinearGradient(
+            0f, baseline - textSize, width.toFloat(), baseline,
+            intArrayOf(
+                Color.rgb(0, 240, 255),
+                Color.WHITE,
+                Color.rgb(115, 190, 255),
+                Color.rgb(255, 70, 175)
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
+
+        val measured = textPaint.measureText("EXIT ARROW")
+        val maxTextWidth = width * 0.88f
+        val scale = if (measured > maxTextWidth) maxTextWidth / measured else 1f
 
         canvas.save()
-        canvas.translate(x, y)
-        canvas.rotate(Math.toDegrees(angle.toDouble()).toFloat())
-
-        path.reset()
-
-        // A single clean, symmetric arrow polygon.
-        path.moveTo(-length * 0.5f, -shaftWidth * 0.5f)
-        path.lineTo(length * 0.5f - headLength, -shaftWidth * 0.5f)
-        path.lineTo(length * 0.5f - headLength, -headWidth * 0.5f)
-        path.lineTo(length * 0.5f, 0f)
-        path.lineTo(length * 0.5f - headLength, headWidth * 0.5f)
-        path.lineTo(length * 0.5f - headLength, shaftWidth * 0.5f)
-        path.lineTo(-length * 0.5f, shaftWidth * 0.5f)
-        path.close()
-
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(1.2f)
-        paint.strokeJoin = Paint.Join.ROUND
-        paint.color = color
-        paint.alpha = alpha
-        paint.maskFilter = BlurMaskFilter(dp(9f), BlurMaskFilter.Blur.NORMAL)
-        canvas.drawPath(path, paint)
-
-        paint.maskFilter = null
-        paint.style = Paint.Style.FILL
-        paint.alpha = (alpha * 0.24f).toInt()
-        canvas.drawPath(path, paint)
-
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(1.4f)
-        paint.alpha = alpha
-        paint.maskFilter = null
-        canvas.drawPath(path, paint)
-
+        canvas.scale(scale, 1f, cx, baseline)
+        canvas.drawText("EXIT ARROW", cx, baseline, textPaint)
         canvas.restore()
-        paint.alpha = 255
-    }
 
-    private fun drawArrows(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float,
-        begin: Float,
-        end: Float,
-        opacity: Float = 1f
-    ) {
-        val enter = progress(t, begin, begin + 0.65f)
-        val exit = 1f - progress(t, end - 0.25f, end)
+        textPaint.shader = null
+        textPaint.clearShadowLayer()
+        textPaint.alpha = 255
 
-        arrows.forEachIndexed { i, a ->
-            val angle = a.angle + t * a.direction * 0.18f
-            val radius = unit * (0.18f + 0.40f * (1f - enter))
-
-            val x = cx + cos(angle) * radius
-            val y = cy + sin(angle) * radius
-
-            val sweepAngle = angle + PI.toFloat() / 2f *
-                    sin(t * 1.8f + i)
-
-            val length = unit * 0.105f * a.size
-            val alpha = (255 * enter * exit * opacity).toInt()
-                .coerceIn(0, 255)
-
-            drawArrowShape(
-                canvas,
-                x, y,
-                sweepAngle,
-                length,
-                colorAt(a.colorIndex),
-                alpha
-            )
-        }
-    }
-
-    private fun drawSwirl(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val p = progress(t, 2.8f, 4.2f)
-
-        arrows.forEachIndexed { i, a ->
-            val startAngle = a.angle
-            val angle = startAngle + p * TWO_PI.toFloat() * 1.5f
-
-            val radius = unit * (
-                0.48f * (1f - p) + 0.045f +
-                    0.018f * sin(t * 5f + i)
-                )
-
-            val x = cx + cos(angle) * radius
-            val y = cy + sin(angle) * radius
-
-            val tangent = angle + PI.toFloat() / 2f
-            val length = unit * 0.11f * a.size
-
-            drawArrowShape(
-                canvas, x, y, tangent, length,
-                colorAt(a.colorIndex),
-                245
-            )
-
-            val trailRadius = radius * 1.15f
-            val trailX = cx + cos(angle - 0.24f) * trailRadius
-            val trailY = cy + sin(angle - 0.24f) * trailRadius
-
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = dp(2f)
-            paint.strokeCap = Paint.Cap.ROUND
-            paint.color = colorAt(a.colorIndex)
-            paint.alpha = 105
-            paint.maskFilter = BlurMaskFilter(dp(7f), BlurMaskFilter.Blur.NORMAL)
-
-            canvas.drawLine(x, y, trailX, trailY, paint)
-
-            paint.maskFilter = null
-            paint.alpha = 255
-        }
-    }
-
-    private fun drawConvergence(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val p = progress(t, 4.2f, 4.8f)
-        val ringP = progress(t, 4.8f, 5.4f)
-
-        arrows.forEachIndexed { i, a ->
-            val angle = a.angle + t * 0.5f
-            val radius = unit * (0.43f * (1f - p) + 0.02f)
-
-            drawArrowShape(
-                canvas,
-                cx + cos(angle) * radius,
-                cy + sin(angle) * radius,
-                angle + PI.toFloat(),
-                unit * 0.10f * a.size,
-                colorAt(a.colorIndex),
-                ((1f - p * 0.65f) * 255).toInt()
-            )
-        }
-
-        drawEnergyRing(canvas, cx, cy, unit, t, ringP)
-
-        val flash = (1f - progress(t, 4.65f, 5.05f)) *
-                progress(t, 4.25f, 4.6f)
-
-        if (flash > 0f) {
-            paint.style = Paint.Style.FILL
-            paint.shader = RadialGradient(
-                cx, cy, unit * 0.32f,
-                intArrayOf(
-                    Color.argb((255 * flash).toInt(), 255, 255, 255),
-                    Color.argb((170 * flash).toInt(), 80, 220, 255),
-                    Color.TRANSPARENT
-                ),
-                null,
-                Shader.TileMode.CLAMP
-            )
-
-            canvas.drawCircle(cx, cy, unit * 0.32f, paint)
-            paint.shader = null
-        }
-    }
-
-    private fun drawEnergyRing(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float,
-        p: Float
-    ) {
-        if (t < 4.65f) return
-
-        val radius = unit * (0.06f + p * 0.28f)
-        val alpha = ((1f - p) * 220).toInt().coerceIn(0, 255)
-
-        for (i in 0 until 3) {
-            paint.style = Paint.Style.STROKE
-            paint.strokeWidth = dp(if (i == 0) 2.5f else 1f)
-            paint.color = colorAt(i * 2)
-            paint.alpha = alpha
-            paint.maskFilter = if (i == 0) {
-                BlurMaskFilter(dp(10f), BlurMaskFilter.Blur.NORMAL)
-            } else null
-
-            canvas.drawCircle(
-                cx, cy,
-                radius * (1f + i * 0.12f),
-                paint
-            )
-        }
-
-        paint.maskFilter = null
-        paint.alpha = 255
-    }
-
-    private fun drawTitle(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val p = progress(t, 5.4f, 6.6f)
-        val alpha = (255 * progress(t, 5.4f, 5.8f)).toInt()
-        val scale = 0.65f + 0.35f * interpolator.getInterpolation(p)
-
-        canvas.save()
-        canvas.translate(cx, cy)
-        canvas.scale(scale, scale)
-
-        val titleSize = unit * 0.145f
-        val subtitleSize = unit * 0.102f
-
-        paint.typeface = Typeface.create(
-            "sans-serif-black",
-            Typeface.BOLD
+        textPaint.typeface = android.graphics.Typeface.create(
+            "sans-serif-medium", android.graphics.Typeface.NORMAL
         )
-        paint.textAlign = Paint.Align.CENTER
-        paint.style = Paint.Style.FILL
-        paint.textSize = titleSize
-        paint.color = Color.WHITE
-        paint.alpha = alpha
+        textPaint.textSize = textSize * 0.19f
+        textPaint.textAlign = Paint.Align.CENTER
+        textPaint.color = Color.argb((175f * alpha / 255f).toInt(), 170, 215, 255)
+        textPaint.setShadowLayer(shortSide * 0.012f, 0f, 0f, Color.CYAN)
+        canvas.drawText("MOVE BEYOND LIMITS", cx, baseline + textSize * 0.42f, textPaint)
+        textPaint.clearShadowLayer()
+        textPaint.alpha = 255
 
-        // Glow behind EXIT.
-        paint.setShadowLayer(dp(20f), 0f, 0f, Color.CYAN)
-        paint.color = Color.rgb(255, 180, 40)
-        canvas.drawText("EXIT", 0f, titleSize * 0.12f, paint)
-
-        paint.clearShadowLayer()
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(2f)
-        paint.color = Color.rgb(255, 210, 70)
-        canvas.drawText("EXIT", 0f, titleSize * 0.12f, paint)
-
-        paint.style = Paint.Style.FILL
-        paint.textSize = subtitleSize
-        paint.color = Color.rgb(0, 205, 255)
-        paint.setShadowLayer(dp(12f), 0f, 0f, Color.CYAN)
-        canvas.drawText("ARROW", 0f, subtitleSize * 1.25f, paint)
-
-        paint.clearShadowLayer()
-        paint.alpha = 255
-
-        canvas.restore()
+        val scan = easeInOutCubic((p - 0.25f) / 0.65f)
+        val scanY = baseline + textSize * 0.20f
+        linePaint.shader = LinearGradient(
+            cx - shortSide * 0.28f + shortSide * 0.56f * scan,
+            scanY,
+            cx + shortSide * 0.28f + shortSide * 0.56f * scan,
+            scanY,
+            intArrayOf(
+                Color.TRANSPARENT,
+                Color.argb(alpha, 90, 245, 255),
+                Color.TRANSPARENT
+            ),
+            null,
+            Shader.TileMode.CLAMP
+        )
+        linePaint.strokeWidth = max(dp(1f), shortSide * 0.0025f)
+        canvas.drawLine(
+            cx - shortSide * 0.30f, scanY,
+            cx + shortSide * 0.30f, scanY,
+            linePaint
+        )
+        linePaint.shader = null
     }
 
-    private fun drawSwoosh(
-        canvas: Canvas,
-        cx: Float,
-        cy: Float,
-        unit: Float,
-        t: Float
-    ) {
-        val p = progress(t, 6.8f, 7.2f)
-        val radius = unit * 0.24f
+    // ============================================
+    // EASING
+    // ============================================
 
-        path.reset()
-        path.moveTo(cx - radius * 1.45f, cy + radius * 0.65f)
-        path.cubicTo(
-            cx - radius * 1.9f, cy - radius * 1.5f,
-            cx + radius * 1.45f, cy - radius * 1.6f,
-            cx + radius * 1.75f, cy - radius * 0.55f
-        )
+    private fun lerp(a: Float, b: Float, t: Float): Float = a + (b - a) * t
 
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = dp(4f)
-        paint.strokeCap = Paint.Cap.ROUND
-        paint.color = Color.CYAN
-        paint.alpha = (210 * p).toInt()
-        paint.maskFilter = BlurMaskFilter(dp(12f), BlurMaskFilter.Blur.NORMAL)
+    private fun dp(value: Float): Float = value * density
 
-        canvas.drawPath(path, paint)
+    private fun easeOutCubic(x: Float): Float {
+        val p = x.coerceIn(0f, 1f)
+        return 1f - (1f - p) * (1f - p) * (1f - p)
+    }
 
-        paint.maskFilter = null
-        paint.strokeWidth = dp(2f)
-        paint.alpha = (240 * p).toInt()
-        canvas.drawPath(path, paint)
+    private fun easeInOutCubic(x: Float): Float {
+        val p = x.coerceIn(0f, 1f)
+        return if (p < 0.5f) {
+            4f * p * p * p
+        } else {
+            1f - ((-2f * p + 2f).let { it * it * it }) / 2f
+        }
+    }
 
-        paint.alpha = 255
-        paint.style = Paint.Style.FILL
-
-        drawArrowShape(
-            canvas,
-            cx + radius * 1.68f,
-            cy - radius * 0.65f,
-            -0.5f,
-            unit * 0.12f,
-            Color.rgb(0, 255, 230),
-            (255 * p).toInt()
-        )
+    private fun easeOutBack(x: Float): Float {
+        val p = x.coerceIn(0f, 1f)
+        val c1 = 1.70158f
+        val c3 = c1 + 1f
+        val q = p - 1f
+        return 1f + c3 * q * q * q + c1 * q * q
     }
 }

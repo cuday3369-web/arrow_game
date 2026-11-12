@@ -1,0 +1,24 @@
+{
+  "animation": {
+    "durationMs": 7200,
+    "spiralTurns": 0.85,
+    "arrowCount": 6
+  },
+  "visual": {
+    "safeMarginFraction": 0.045,
+    "centerYFraction": 0.5,
+    "titleYFraction": 0.72,
+    "arrowHeadSizeFraction": 0.06,
+    "shaftWidthFraction": 0.0085,
+    "glowWidthFraction": 0.03
+  },
+  "palette": [
+    "#FF0000",
+    "#FF7F00",
+    "#FFFF00",
+    "#00FF00",
+    "#00BFFF",
+    "#8B00FF"
+  ],
+  "description": "Six rainbow arrows spiral outward from the exact screen centre. Their tails remain at the centre until all arrowheads reach the screen edges, then all tails move outward together. Particles continuously scatter outward without bouncing."
+}
