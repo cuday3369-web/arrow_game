@@ -61,6 +61,10 @@ data class Puzzle(
     val level: Int = 1,
     val difficulty: String = "Easy",
     val seed: Long = 0L,
+    val shapeId: String = "classic",
+    val shapeCategory: String = "CLASSIC",
+    val shapeFormation: String = "HYBRID",
+    val shapeCells: Set<Pair<Int, Int>> = emptySet(),
 ) {
     init {
         require((rows > 0) && (cols > 0))

@@ -228,8 +228,12 @@ class PuzzleBoardView(context: Context) : View(context) {
         paint.style = Paint.Style.FILL
         val dotColor = if (isNight) Color.argb(65, 255, 255, 255) else Color.argb(45, 0, 0, 0)
 
+        val hasShapeMask = puzzle.shapeCells.isNotEmpty()
         for (r in 0 until puzzle.rows) {
             for (c in 0 until puzzle.cols) {
+                // On object-shaped levels, keep the guide dots inside the silhouette.
+                // Classic levels retain the original full rectangular dot grid.
+                if (hasShapeMask && (r to c) !in puzzle.shapeCells) continue
                 val cx = left + (c + 0.5f) * cell
                 val cy = top + (r + 0.5f) * cell
                 paint.color = dotColor

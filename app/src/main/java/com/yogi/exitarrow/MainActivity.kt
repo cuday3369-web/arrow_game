@@ -1350,7 +1350,14 @@ class MainActivity : Activity() {
     private fun updateUI() {
         if (!::statsLabel.isInitialized) return
 
-        levelLabel.text = getString(R.string.level_label_format, level)
+        val shapeName = if (::board.isInitialized && board.puzzle.shapeId != "classic") {
+            board.puzzle.title.substringAfter("·", "").trim().takeIf { it.isNotBlank() }
+        } else null
+        levelLabel.text = if (shapeName != null) {
+            "LEVEL $level  ·  $shapeName"
+        } else {
+            getString(R.string.level_label_format, level)
+        }
         val remaining = if (::board.isInitialized) {
             board.puzzle.arrows.count { it.active }
         } else {

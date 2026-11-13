@@ -1,6 +1,7 @@
 package com.yogi.exitarrow
 
 import java.util.Random
+import com.yogi.exitarrow.shape.ShapeLibrary
 
 data class LevelConfig(
     val level: Int,
@@ -13,8 +14,8 @@ object PuzzleGenerator {
     fun configForLevel(level: Int, maxCap: Int = 16): LevelConfig {
         val safeLevel = maxOf(1, level)
         val maxCapClamped = maxOf(6, maxCap)
-        val calculatedGridSize = (6 + ((safeLevel - 1) / 10)).coerceAtMost(maxCapClamped)
-        val calculatedTargetArrows = 12 + ((safeLevel - 1) * 2)
+        val calculatedGridSize = (8 + ((safeLevel - 1) / 12)).coerceAtMost(maxCapClamped)
+        val calculatedTargetArrows = (10 + ((safeLevel - 1) * 2)).coerceAtMost(160)
         return LevelConfig(
             level = safeLevel,
             gridSize = calculatedGridSize,
@@ -29,34 +30,20 @@ object PuzzleGenerator {
         Direction.DOWN
     )
 
-    fun difficultyForLevel(level: Int): String {
-        val safeLevel = maxOf(1, level)
-        return when (safeLevel % 5) {
-            1 -> "Easy"
-            2 -> "Medium"
-            3 -> "Hard"
-            4 -> "Super Hard"
-            0 -> "Unbeatable"
-            else -> "Easy"
-        }
-    }
+    fun difficultyForLevel(level: Int): String =
+        com.yogi.exitarrow.generation.AdaptiveDifficulty.targetLabelForLevel(level)
 
-    fun shapeThemeForLevel(level: Int): String {
-        val safeLevel = maxOf(1, level)
-        return when (safeLevel % 8) {
-            1 -> "Heart Shaped Arrow Level ♥"
-            2 -> "Diamond Arrow Grid ◆"
-            3 -> "Star Pattern Matrix ★"
-            4 -> "Spiral Arrow Cascade 🌀"
-            5 -> "Cross Loop Puzzle ✚"
-            6 -> "Crown Fortress Arrow 👑"
-            7 -> "Zigzag Arrow Maze ⚡"
-            0 -> "Infinity Loop Challenge ♾"
-            else -> "Classic Arrow Level"
-        }
-    }
+    fun shapeThemeForLevel(level: Int): String =
+        "${ShapeLibrary.templateForLevel(level).displayName} Arrow Puzzle"
 
+    /** Generates a shape-constrained puzzle first, then falls back to the legacy generator. */
     fun generate(level: Int, maxGridCap: Int = 16): Puzzle {
+        return com.yogi.exitarrow.generation.ObjectShapePuzzleGenerator.generate(level, maxGridCap)
+            ?: generateClassic(level, maxGridCap)
+    }
+
+    /** Previous grid generator retained as a safe fallback for very small/unusual masks. */
+    private fun generateClassic(level: Int, maxGridCap: Int = 16): Puzzle {
         val safeLevel = maxOf(1, level)
         val config = configForLevel(safeLevel, maxGridCap)
         val size = config.gridSize
